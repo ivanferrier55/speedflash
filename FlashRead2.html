@@ -88,6 +88,9 @@ header h1{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;letter-
 .btn:disabled{opacity:0.3;cursor:not-allowed;}
 .btn.jp-primary{background:var(--accent-jp);color:#000;border-color:var(--accent-jp);font-weight:500;}
 .btn.jp-primary:hover{background:#2eb8f0;}
+.btn.sf-primary{background:var(--accent2);color:#000;border-color:var(--accent2);font-weight:500;}
+.btn.sf-primary:hover{background:#e85a3a;}
+
 .btn.danger{border-color:var(--accent2);color:var(--accent2);}
 .btn.danger:hover{background:rgba(255,107,71,0.12);}
 input[type=range]{-webkit-appearance:none;height:4px;background:var(--border);border-radius:99px;outline:none;flex:1;min-width:60px;cursor:pointer;}
@@ -200,6 +203,11 @@ textarea::placeholder{color:var(--muted);}
     </div>
     <div class="app-card jp" onclick="openApp('jp')">
       <div class="card-icon">あ</div>
+    <div class="app-card sf" onclick="openApp('sf')">
+      <div class="card-icon">⚡</div>
+      <div class="card-text"><h2>SpeedFlash</h2><p>Flashcard speed trainer — circular buffer with adaptive difficulty.</p></div>
+      <div class="card-arrow">›</div>
+    </div>
       <div class="card-text"><h2>Japanese Practice</h2><p>Hiragana & katakana — 4 stages each, compound levels, confused pairs, fluency test.</p></div>
       <div class="card-arrow">›</div>
     </div>
@@ -245,6 +253,59 @@ textarea::placeholder{color:var(--muted);}
       </div>
     </div>
     <div class="kbd-hint"><kbd>Space</kbd> play/pause &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> step &nbsp;·&nbsp; <kbd>R</kbd> reset</div>
+  </div>
+</div>
+
+<!-- SPEEDFLASH -->
+<div class="screen" id="sfScreen">
+  <div class="app-main">
+    <div class="stage-display" style="height:200px;">
+      <div class="word-display" id="sfFlashDisplay" style="font-size:clamp(3rem,8vw,5rem);">⏸</div>
+      <div class="stage-hint" id="sfHint">select a set and press play</div>
+    </div>
+    <div class="hint-bar-wrap">
+      <div class="hint-bar">
+        <div class="hint-chips" id="sfHintChips"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.66rem;color:var(--muted);">
+      <span id="sfProgressText">0 / 0 seen</span>
+      <span id="sfPhaseText">Phase 1</span>
+      <span id="sfBenchmarkText">Benchmark: —</span>
+    </div>
+    <div class="progress-row">
+      <span id="sfProgressCount">—</span>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="sfProgressBar"></div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+      <button class="btn sf-primary" id="sfPlayPauseBtn" onclick="sfTogglePlayPause()" style="min-width:82px;">Play</button>
+      <button class="btn" onclick="sfNext()" id="sfNextBtn" disabled>Next ✓</button>
+      <button class="btn" onclick="sfBack()" id="sfBackBtn" disabled>↩ Back</button>
+      <button class="btn" onclick="sfHint()" id="sfHintBtn" disabled>💡 Hint</button>
+      <div style="display:flex;align-items:center;gap:5px;margin-left:auto;">
+        <button class="btn" style="padding:6px 12px;font-size:0.95rem;background:var(--accent);color:#000;border-color:var(--accent);font-weight:500;" onclick="sfSetCPM(100)">100</button>
+        <button class="btn" style="padding:6px 12px;font-size:0.95rem;background:var(--accent);color:#000;border-color:var(--accent);font-weight:500;" onclick="sfSetCPM(300)">300</button>
+        <button class="btn" style="padding:6px 12px;font-size:0.95rem;background:var(--accent);color:#000;border-color:var(--accent);font-weight:500;" onclick="sfSetCPM(500)">500</button>
+      </div>
+    </div>
+    <div class="card-panel">
+      <div class="panel-header">
+        <span class="panel-label">Set Selector</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="sfSetSelector"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <input type="file" id="sfCsvUpload" accept=".csv" style="display:none;" onchange="sfLoadCSV(event)">
+        <button class="sample-btn" onclick="document.getElementById('sfCsvUpload').click()">📤 Upload CSV</button>
+        <button class="sample-btn" onclick="sfResetSet()">🔄 Reset Set</button>
+      </div>
+    </div>
+    <div class="card-panel" id="sfStatsPanel" style="display:none;">
+      <div class="panel-header">
+        <span class="panel-label">Stats Spreadsheet</span>
+        <button class="sample-btn" onclick="sfCloseStats()">✕ Close</button>
+      </div>
+      <div id="sfStatsGrid" style="overflow-x:auto;max-height:300px;overflow-y:auto;"></div>
+    </div>
   </div>
 </div>
 
@@ -1579,3 +1640,482 @@ document.addEventListener('keydown',e=>{
 </script>
 </body>
 </html>
+// ═══════════════════════════════════════
+// SPEEDFLASH CORE LOGIC
+// ═══════════════════════════════════════
+let sfState = {
+  buffer: [],
+  window: [],
+  graduated: [],
+  currentSet: null,
+  currentSetName: null,
+  cpm: 300,
+  playing: false,
+  paused: true,
+  timer: null,
+  phase: 1, // 1 = seeing all, 2 = benchmark phase
+  benchmark: null,
+  seenCount: 0,
+  totalCards: 0,
+  currentIndex: 0,
+  stats: {}, // front -> {flashes, hints, visits, lap}
+  hintFlash: false,
+  canBack: false,
+  previousState: null,
+  windowSize: 5,
+  roundComplete: false,
+  celebrationShown: false
+};
+
+function sfInit() {
+  sfBuildSetSelector();
+  sfLoadStats();
+}
+
+function sfBuildSetSelector() {
+  const el = document.getElementById('sfSetSelector');
+  el.innerHTML = '';
+  // Preloaded sets
+  Object.keys(SF_PRELOADED_SETS).forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'stage-tab';
+    btn.textContent = SF_PRELOADED_SETS[key].label;
+    btn.onclick = () => sfSelectSet(key, 'preload');
+    el.appendChild(btn);
+  });
+  // Custom sets from localStorage
+  const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
+  Object.keys(customSets).forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'stage-tab';
+    btn.textContent = '📁 ' + key;
+    btn.onclick = () => sfSelectSet(key, 'custom');
+    el.appendChild(btn);
+  });
+}
+
+function sfSelectSet(key, type) {
+  sfStop();
+  let cards;
+  if (type === 'preload') {
+    cards = SF_PRELOADED_SETS[key].cards;
+    sfState.currentSetName = SF_PRELOADED_SETS[key].label;
+  } else {
+    const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
+    cards = customSets[key];
+    sfState.currentSetName = key;
+  }
+  sfState.currentSet = key;
+  sfState.totalCards = cards.length;
+  sfState.buffer = cards.map(c => ({...c}));
+  sfState.stats = {};
+  sfState.graduated = [];
+  sfState.seenCount = 0;
+  sfState.phase = 1;
+  sfState.benchmark = null;
+  sfState.roundComplete = false;
+  sfState.celebrationShown = false;
+  sfState.currentIndex = 0;
+  
+  // Initialize stats
+  sfState.buffer.forEach(c => {
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
+  });
+  
+  sfState.window = sfState.buffer.slice(0, sfState.windowSize);
+  sfState.buffer = sfState.buffer.slice(sfState.windowSize);
+  
+  sfRenderHintChips();
+  sfUpdateDisplay();
+  sfUpdateUI();
+  sfSaveStats();
+  document.getElementById('sfHint').textContent = 'paused — press play to start';
+  document.getElementById('sfPlayPauseBtn').textContent = 'Play';
+}
+
+function sfRenderHintChips() {
+  const el = document.getElementById('sfHintChips');
+  el.innerHTML = '';
+  if (!sfState.window.length) {
+    el.innerHTML = '<span style="font-size:0.66rem;color:var(--muted);font-style:italic;">No cards in window</span>';
+    return;
+  }
+  sfState.window.forEach((card, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'hint-chip';
+    const isTarget = idx === 0;
+    if (isTarget) {
+      chip.style.borderColor = 'var(--accent2)';
+      chip.style.background = 'rgba(255,107,71,0.15)';
+      chip.style.transform = 'scale(1.1)';
+    }
+    const back = document.createElement('span');
+    back.className = 'chip-rom';
+    back.textContent = card.back;
+    back.style.fontSize = isTarget ? '0.8rem' : '0.6rem';
+    back.style.fontWeight = isTarget ? 'bold' : 'normal';
+    chip.appendChild(back);
+    el.appendChild(chip);
+  });
+}
+
+function sfUpdateDisplay() {
+  const el = document.getElementById('sfFlashDisplay');
+  if (!sfState.window.length) {
+    el.textContent = '✓';
+    return;
+  }
+  const card = sfState.window[0];
+  if (sfState.hintFlash) {
+    el.textContent = card.front;
+    el.style.color = 'var(--accent2)';
+    setTimeout(() => {
+      el.style.color = 'var(--text)';
+      sfState.hintFlash = false;
+    }, 1000 / sfState.cpm);
+  } else {
+    el.textContent = card.front;
+    el.style.color = 'var(--text)';
+  }
+}
+
+function sfUpdateUI() {
+  const total = sfState.totalCards;
+  const seen = sfState.seenCount;
+  document.getElementById('sfProgressText').textContent = `${seen} / ${total} seen`;
+  document.getElementById('sfPhaseText').textContent = sfState.phase === 1 ? 'Phase 1: Learning' : 'Phase 2: Mastery';
+  document.getElementById('sfBenchmarkText').textContent = sfState.benchmark ? `Benchmark: ${sfState.benchmark} flashes` : 'Benchmark: —';
+  document.getElementById('sfProgressCount').textContent = `${sfState.window.length} in window`;
+  const progress = total > 0 ? (seen / total * 100) : 0;
+  document.getElementById('sfProgressBar').style.width = Math.min(progress, 100) + '%';
+  document.getElementById('sfNextBtn').disabled = !sfState.window.length || sfState.paused;
+  document.getElementById('sfBackBtn').disabled = !sfState.canBack;
+  document.getElementById('sfHintBtn').disabled = !sfState.window.length || sfState.paused;
+}
+
+function sfTogglePlayPause() {
+  if (sfState.paused) {
+    sfPlay();
+  } else {
+    sfPause();
+  }
+}
+
+function sfPlay() {
+  if (!sfState.window.length) {
+    document.getElementById('sfHint').textContent = 'no cards — select a set first';
+    return;
+  }
+  sfState.paused = false;
+  sfState.playing = true;
+  document.getElementById('sfPlayPauseBtn').textContent = 'Pause';
+  document.getElementById('sfHint').textContent = 'running...';
+  sfStep();
+}
+
+function sfPause() {
+  sfState.paused = true;
+  sfState.playing = false;
+  clearTimeout(sfState.timer);
+  document.getElementById('sfPlayPauseBtn').textContent = 'Play';
+  document.getElementById('sfHint').textContent = 'paused';
+  sfShowStats();
+}
+
+function sfStop() {
+  sfState.paused = true;
+  sfState.playing = false;
+  clearTimeout(sfState.timer);
+  document.getElementById('sfPlayPauseBtn').textContent = 'Play';
+}
+
+function sfStep() {
+  if (!sfState.playing || sfState.paused) return;
+  sfUpdateDisplay();
+  sfState.stats[sfState.window[0].front].flashes++;
+  sfState.timer = setTimeout(sfStep, 60000 / sfState.cpm);
+}
+
+function sfNext() {
+  if (!sfState.window.length || sfState.paused) return;
+  const target = sfState.window[0];
+  // Save previous state for back button
+  sfState.previousState = {
+    window: [...sfState.window],
+    buffer: [...sfState.buffer],
+    graduated: [...sfState.graduated],
+    target: {...target},
+    stats: {...sfState.stats[target.front]}
+  };
+  sfState.canBack = true;
+  
+  // Green flash
+  const el = document.getElementById('sfFlashDisplay');
+  el.style.color = '#00ff88';
+  setTimeout(() => { el.style.color = 'var(--text)'; }, 200);
+  
+  // Graduate the target
+  sfState.stats[target.front].visits++;
+  sfState.stats[target.front].lap = sfState.phase;
+  sfState.seenCount++;
+  
+  // Remove from window
+  sfState.window.shift();
+  
+  // Add to graduated list (most recent)
+  sfState.graduated.unshift(target);
+  if (sfState.graduated.length > 4) sfState.graduated.pop();
+  
+  // Refill buffer from graduated if needed
+  if (sfState.buffer.length < sfState.windowSize - sfState.window.length) {
+    while (sfState.buffer.length < sfState.windowSize - sfState.window.length && sfState.graduated.length) {
+      sfState.buffer.push(sfState.graduated.pop());
+    }
+  }
+  
+  // Refill window from buffer
+  while (sfState.window.length < sfState.windowSize && sfState.buffer.length) {
+    sfState.window.push(sfState.buffer.shift());
+  }
+  
+  sfRenderHintChips();
+  sfUpdateDisplay();
+  sfUpdateUI();
+  sfSaveStats();
+  
+  // Check phase completion
+  sfCheckPhaseComplete();
+}
+
+function sfBack() {
+  if (!sfState.canBack || !sfState.previousState) return;
+  // Restore previous state
+  const prev = sfState.previousState;
+  sfState.window = prev.window;
+  sfState.buffer = prev.buffer;
+  sfState.graduated = prev.graduated;
+  sfState.stats[prev.target.front] = prev.stats;
+  sfState.seenCount--;
+  sfState.canBack = false;
+  sfState.previousState = null;
+  
+  sfRenderHintChips();
+  sfUpdateDisplay();
+  sfUpdateUI();
+  sfSaveStats();
+}
+
+function sfHint() {
+  if (!sfState.window.length || sfState.paused) return;
+  sfState.hintFlash = true;
+  sfState.stats[sfState.window[0].front].hints++;
+  sfUpdateDisplay();
+}
+
+function sfSetCPM(cpm) {
+  sfState.cpm = cpm;
+  if (sfState.playing && !sfState.paused) {
+    clearTimeout(sfState.timer);
+    sfStep();
+  }
+}
+
+function sfCheckPhaseComplete() {
+  if (sfState.phase === 1 && sfState.seenCount >= sfState.totalCards) {
+    // Phase 1 complete - calculate benchmark
+    const noHintCards = Object.keys(sfState.stats)
+      .filter(k => sfState.stats[k].hints === 0 && sfState.stats[k].visits > 0)
+      .map(k => ({front: k, flashes: sfState.stats[k].flashes}))
+      .sort((a,b) => a.flashes - b.flashes);
+    
+    if (noHintCards.length >= 4) {
+      const quartileSize = Math.floor(noHintCards.length / 4);
+      const bestQuartile = noHintCards.slice(0, quartileSize);
+      sfState.benchmark = Math.max(1, Math.round(bestQuartile.reduce((sum, c) => sum + c.flashes, 0) / bestQuartile.length));
+    } else {
+      sfState.benchmark = 6; // fallback
+    }
+    
+    sfState.phase = 2;
+    sfState.seenCount = 0;
+    sfState.totalCards = Object.keys(sfState.stats).length;
+    // Reset seen count for phase 2
+    Object.keys(sfState.stats).forEach(k => {
+      sfState.stats[k].visits = 0;
+    });
+    sfShowCelebration('🎉 All cards seen! Phase 2 started!');
+    sfUpdateUI();
+  } else if (sfState.phase === 2) {
+    // Check if all cards have reached benchmark
+    const allReached = Object.keys(sfState.stats).every(k => 
+      sfState.stats[k].visits > 0 && sfState.stats[k].flashes >= sfState.benchmark
+    );
+    if (allReached && !sfState.celebrationShown) {
+      sfState.celebrationShown = true;
+      sfShowCelebration('🏆 All cards graduated! Amazing!');
+      sfPause();
+    }
+  }
+}
+
+function sfShowCelebration(message) {
+  const el = document.getElementById('sfFlashDisplay');
+  el.textContent = message;
+  el.style.color = 'var(--accent)';
+  el.style.fontSize = 'clamp(1.5rem,4vw,2.5rem)';
+  setTimeout(() => {
+    el.style.color = 'var(--text)';
+    el.style.fontSize = 'clamp(3rem,8vw,5rem)';
+    if (sfState.window.length) sfUpdateDisplay();
+  }, 3000);
+}
+
+// ═══════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════
+function sfShowStats() {
+  const panel = document.getElementById('sfStatsPanel');
+  panel.style.display = 'block';
+  const grid = document.getElementById('sfStatsGrid');
+  grid.innerHTML = '';
+  const table = document.createElement('table');
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.7rem;';
+  // Header
+  const thead = document.createElement('thead');
+  const tr = document.createElement('tr');
+  ['Front','Flashes','Hints','Visits','Lap'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    th.style.cssText = 'text-align:left;padding:4px 6px;color:var(--muted);border-bottom:1px solid var(--border);';
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+  table.appendChild(thead);
+  // Body
+  const tbody = document.createElement('tbody');
+  Object.keys(sfState.stats).sort().forEach(front => {
+    const s = sfState.stats[front];
+    const tr2 = document.createElement('tr');
+    [front, s.flashes, s.hints, s.visits, s.lap || '-'].forEach(val => {
+      const td = document.createElement('td');
+      td.textContent = val;
+      td.style.cssText = 'padding:4px 6px;border-bottom:1px solid var(--border);';
+      tr2.appendChild(td);
+    });
+    tbody.appendChild(tr2);
+  });
+  table.appendChild(tbody);
+  grid.appendChild(table);
+}
+
+function sfCloseStats() {
+  document.getElementById('sfStatsPanel').style.display = 'none';
+  if (!sfState.paused) sfPause();
+}
+
+function sfSaveStats() {
+  try {
+    const data = {
+      stats: sfState.stats,
+      set: sfState.currentSet,
+      setname: sfState.currentSetName,
+      benchmark: sfState.benchmark,
+      phase: sfState.phase
+    };
+    localStorage.setItem('sf_stats_' + sfState.currentSet, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function sfLoadStats() {
+  // Stats loaded per set when selected
+}
+
+// ═══════════════════════════════════════
+// CSV UPLOAD
+// ═══════════════════════════════════════
+function sfLoadCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').filter(l => l.trim());
+    const cards = [];
+    lines.forEach(line => {
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        cards.push({front: parts[0], back: parts[1]});
+      }
+    });
+    if (!cards.length) {
+      alert('No valid cards found in CSV. Expected: front,back');
+      return;
+    }
+    const name = prompt('Name for this custom set:', file.name.replace('.csv', ''));
+    if (!name) return;
+    const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
+    customSets[name] = cards;
+    localStorage.setItem('sf_custom_sets', JSON.stringify(customSets));
+    sfBuildSetSelector();
+    alert(`✅ Loaded ${cards.length} cards as "${name}"`);
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function sfResetSet() {
+  if (!sfState.currentSet) return;
+  if (confirm('Reset all stats for this set?')) {
+    const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
+    if (customSets[sfState.currentSet]) {
+      sfState.buffer = customSets[sfState.currentSet].map(c => ({...c}));
+    } else {
+      sfState.buffer = SF_PRELOADED_SETS[sfState.currentSet].cards.map(c => ({...c}));
+    }
+    sfState.stats = {};
+    sfState.graduated = [];
+    sfState.seenCount = 0;
+    sfState.phase = 1;
+    sfState.benchmark = null;
+    sfState.celebrationShown = false;
+    sfState.window = sfState.buffer.slice(0, sfState.windowSize);
+    sfState.buffer = sfState.buffer.slice(sfState.windowSize);
+    sfState.buffer.forEach(c => {
+      sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
+    });
+    sfRenderHintChips();
+    sfUpdateDisplay();
+    sfUpdateUI();
+    sfSaveStats();
+    document.getElementById('sfHint').textContent = 'reset complete';
+  }
+}
+
+// ═══════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════
+document.addEventListener('keydown', function(e) {
+  const sfActive = document.getElementById('sfScreen').classList.contains('active');
+  if (!sfActive) return;
+  const tag = document.activeElement.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    sfTogglePlayPause();
+  }
+  if (e.code === 'ArrowRight' || e.key === 'Enter') {
+    e.preventDefault();
+    sfNext();
+  }
+  if (e.code === 'ArrowLeft') {
+    e.preventDefault();
+    sfBack();
+  }
+  if (e.key === 'h') {
+    e.preventDefault();
+    sfHint();
+  }
+  if (e.key === '1') sfSetCPM(100);
+  if (e.key === '2') sfSetCPM(300);
+  if (e.key === '3') sfSetCPM(500);
+});
