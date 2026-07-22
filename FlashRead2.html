@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashRead</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0d0f;--surface:#16161a;--border:#2a2a32;
+  --accent:#e8ff47;--accent-jp:#47c8ff;--accent2:#ff6b47;
+  --text:#f0f0f0;--muted:#666;--word-bg:#111115;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+header{width:100%;padding:14px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+header h1{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;letter-spacing:-0.03em;}
+.back-btn{font-family:'DM Mono',monospace;font-size:0.72rem;background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
+.back-btn:hover{color:var(--text);border-color:var(--text);}
+.app-label{font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-left:auto;}
+
+.screen{display:none;width:100%;flex-direction:column;align-items:center;}
+.screen.active{display:flex;}
+
+#homeScreen .main{max-width:580px;width:100%;padding:48px 20px 80px;display:flex;flex-direction:column;gap:14px;}
+.home-title{font-family:'Syne',sans-serif;font-size:1.9rem;font-weight:800;letter-spacing:-0.04em;margin-bottom:4px;}
+.home-title span{color:var(--accent);}
+.home-sub{font-size:0.76rem;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.app-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:16px;}
+.app-card:hover{transform:translateY(-2px);}
+.app-card.bible:hover{border-color:var(--accent);}
+.app-card.jp:hover{border-color:var(--accent-jp);}
+.card-icon{font-size:1.8rem;width:44px;text-align:center;flex-shrink:0;}
+.card-text h2{font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;margin-bottom:3px;}
+.app-card.bible .card-text h2{color:var(--accent);}
+.app-card.jp .card-text h2{color:var(--accent-jp);}
+.card-text p{font-size:0.7rem;color:var(--muted);line-height:1.5;}
+.card-arrow{margin-left:auto;font-size:1.2rem;color:var(--border);flex-shrink:0;}
+
+.app-main{width:100%;max-width:820px;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px;}
+
+.stage-display{background:var(--word-bg);border:1px solid var(--border);border-radius:14px;height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;gap:6px;}
+.stage-display::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:2px;height:100%;background:linear-gradient(to bottom,transparent,var(--accent-jp) 40%,var(--accent-jp) 60%,transparent);opacity:0.15;}
+.kana-char{font-family:'Syne',sans-serif;font-size:clamp(2.8rem,9vw,5rem);font-weight:700;color:var(--accent-jp);line-height:1;user-select:none;}
+.kana-char.red-locked{color:var(--accent2)!important;}
+.kana-char.flash{animation:flash 0.08s ease;}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:0.2}}
+.romaji-sub{font-family:'DM Mono',monospace;font-size:0.95rem;color:var(--muted);letter-spacing:0.08em;height:1.3rem;display:flex;align-items:center;user-select:none;}
+.stage-hint{position:absolute;bottom:10px;font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;}
+
+.hint-bar-wrap{display:flex;flex-direction:column;gap:6px;}
+.hint-nav-row{display:flex;align-items:center;gap:8px;}
+.hint-nav-btn{font-family:'DM Mono',monospace;font-size:0.7rem;padding:6px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;flex-shrink:0;}
+.hint-nav-btn:hover:not(:disabled){border-color:var(--accent-jp);color:var(--accent-jp);}
+.hint-nav-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.hint-level-label{flex:1;text-align:center;font-size:0.7rem;color:var(--accent-jp);letter-spacing:0.04em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hint-bar{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:62px;align-items:stretch;}
+.hint-chips{flex:1;display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:center;gap:5px;padding:8px 10px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.hint-chips::-webkit-scrollbar{height:3px;}
+.hint-chips::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px;}
+.hint-chip{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:42px;height:44px;padding:0 5px;border-radius:7px;border:1px solid var(--border);background:var(--bg);cursor:pointer;user-select:none;transition:border-color 0.12s,background 0.12s;position:relative;}
+.hint-chip:hover{border-color:var(--accent-jp);}
+.hint-chip.chip-locked{border-color:var(--accent2)!important;background:rgba(255,107,71,0.12);}
+.hint-chip.chip-locked .chip-kana,.hint-chip.chip-locked .chip-rom{color:var(--accent2)!important;}
+.chip-kana{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text);line-height:1;}
+.chip-rom{font-size:0.48rem;color:var(--muted);letter-spacing:0.04em;line-height:1;}
+.chip-placeholder{width:42px;height:44px;border-radius:7px;border:1px dashed var(--border);background:transparent;flex-shrink:0;}
+.hint-chip.chip-placeholder-mode{background:transparent;border-style:dashed;}
+.chip-struggle-dot{position:absolute;bottom:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--accent2);display:none;}
+.chip-struggle-dot.visible{display:block;}
+.hint-toggle-btn{flex-shrink:0;width:64px;border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:transparent;border-top:none;border-right:none;border-bottom:none;color:var(--accent-jp);transition:background 0.15s;padding:6px 3px;}
+.hint-toggle-btn:hover{background:rgba(71,200,255,0.08);}
+.hint-toggle-btn .htb-state{font-size:0.58rem;font-weight:500;letter-spacing:0.04em;font-family:'DM Mono',monospace;}
+.hint-toggle-btn .htb-icon{font-size:1rem;}
+
+.struggle-check-row{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:5px;padding:2px 2px 4px;scrollbar-width:none;}
+.struggle-check-row::-webkit-scrollbar{display:none;}
+.struggle-check-cell{flex-shrink:0;width:42px;display:flex;align-items:center;justify-content:center;}
+.struggle-check-cell input[type=checkbox]{width:13px;height:13px;accent-color:var(--accent2);cursor:pointer;}
+.struggle-check-spacer{flex-shrink:0;width:64px;}
+
+.progress-row{display:flex;align-items:center;gap:10px;font-size:0.68rem;color:var(--muted);}
+.progress-bar-wrap{flex:1;height:3px;background:var(--border);border-radius:99px;overflow:hidden;}
+.progress-bar{height:100%;background:var(--accent-jp);border-radius:99px;width:0%;transition:width 0.1s linear;}
+
+.btn{font-family:'DM Mono',monospace;font-size:0.74rem;padding:8px 16px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface);color:var(--text);transition:all 0.15s;letter-spacing:0.03em;}
+.btn:hover{border-color:var(--accent-jp);color:var(--accent-jp);}
+.btn:disabled{opacity:0.3;cursor:not-allowed;}
+.btn.jp-primary{background:var(--accent-jp);color:#000;border-color:var(--accent-jp);font-weight:500;}
+.btn.jp-primary:hover{background:#2eb8f0;}
+.btn.danger{border-color:var(--accent2);color:var(--accent2);}
+.btn.danger:hover{background:rgba(255,107,71,0.12);}
+input[type=range]{-webkit-appearance:none;height:4px;background:var(--border);border-radius:99px;outline:none;flex:1;min-width:60px;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--accent-jp);border-radius:50%;cursor:pointer;}
+
+.card-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.panel-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
+.panel-label{font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+
+.level-display{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+.level-display .ld-info{display:flex;flex-direction:column;gap:2px;}
+.level-display .ld-title{font-size:0.76rem;color:var(--accent-jp);font-weight:500;}
+.level-display .ld-desc{font-size:0.6rem;color:var(--muted);}
+.level-display .ld-badge{font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;color:var(--accent-jp);}
+
+.stage-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}
+@media(max-width:520px){.stage-grid{grid-template-columns:repeat(2,1fr);}}
+.stage-tab{font-family:'DM Mono',monospace;font-size:0.62rem;padding:5px 8px;border:1px solid var(--border);border-radius:18px;cursor:pointer;background:transparent;color:var(--muted);transition:all 0.15s;text-align:center;white-space:nowrap;}
+.stage-tab.active{background:var(--accent-jp);color:#000;border-color:var(--accent-jp);font-weight:500;}
+.stage-tab:hover:not(.active){border-color:var(--accent-jp);color:var(--accent-jp);}
+.stage-tab.stage-complete{background:rgba(71,200,255,0.15);border-color:var(--accent-jp);color:var(--accent-jp);}
+.script-row-label{font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;padding:2px 0;}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.toggle-switch{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:99px;cursor:pointer;transition:background 0.2s;}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:transform 0.2s,background 0.2s;}
+input:checked+.toggle-slider{background:rgba(71,200,255,0.3);}
+input:checked+.toggle-slider::before{transform:translateX(18px);background:var(--accent-jp);}
+
+.gojuuon-wrap{overflow-x:auto;}
+.gojuuon{border-collapse:collapse;font-size:0.76rem;width:100%;}
+.gojuuon th,.gojuuon td{border:1px solid var(--border);text-align:center;padding:0;}
+.gojuuon th{background:var(--bg);color:var(--muted);font-size:0.58rem;letter-spacing:0.05em;padding:4px 5px;font-weight:400;}
+.kana-cell{width:46px;height:44px;cursor:pointer;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface);}
+.kana-cell:hover{background:#1e2a30;}
+.kana-cell.row-selected{background:rgba(71,200,255,0.15);}
+.kana-cell.row-selected .kana-glyph{color:var(--accent-jp);}
+.kana-cell.in-level{outline:2px solid var(--accent-jp);outline-offset:-2px;}
+.kana-cell.empty{background:var(--bg);cursor:default;}
+.kana-glyph{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--text);}
+.kana-rom{font-size:0.46rem;color:var(--muted);letter-spacing:0.04em;}
+.row-label-cell{padding:2px 5px;background:var(--bg);color:var(--muted);font-size:0.58rem;white-space:nowrap;cursor:pointer;user-select:none;transition:color 0.12s;}
+.row-label-cell:hover{color:var(--accent-jp);}
+.row-label-cell.row-active{color:var(--accent-jp);}
+
+.compound-grid-table{border-collapse:collapse;width:100%;}
+.compound-grid-table td{border:1px solid var(--border);padding:0;text-align:center;}
+.compound-grid-table th{border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:0.56rem;padding:3px 5px;font-weight:400;}
+.compound-cell{width:54px;height:46px;cursor:pointer;transition:all 0.12s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:var(--surface);}
+.compound-cell:hover{background:#1e2a30;}
+.compound-cell.row-selected{background:rgba(71,200,255,0.15);}
+.compound-cell.row-selected .kana-glyph{color:var(--accent-jp);}
+.compound-cell.in-level{outline:2px solid var(--accent-jp);outline-offset:-2px;}
+
+.similar-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.pair-card{display:flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:5px 8px;cursor:pointer;transition:all 0.12s;}
+.pair-card:hover{border-color:var(--accent-jp);}
+.pair-card.row-selected{border-color:var(--accent-jp);background:rgba(71,200,255,0.1);}
+.pair-card.in-level{outline:2px solid var(--accent-jp);}
+.pair-kana{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;color:var(--text);}
+.pair-sep{color:var(--muted);font-size:0.8rem;}
+.pair-rom{font-size:0.48rem;color:var(--muted);text-align:center;line-height:1.3;}
+
+.fluency-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;}
+@media(max-width:520px){.fluency-grid{grid-template-columns:repeat(2,1fr);}}
+.fluency-level-btn{font-family:'DM Mono',monospace;font-size:0.6rem;padding:5px 6px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:var(--bg);color:var(--muted);transition:all 0.12s;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fluency-level-btn.selected{background:rgba(71,200,255,0.18);border-color:var(--accent-jp);color:var(--accent-jp);}
+.fluency-level-btn:hover:not(.selected){border-color:var(--accent-jp);color:var(--accent-jp);}
+.fluency-script-label{font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;grid-column:1/-1;padding:4px 0 2px;}
+
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;text-align:center;}
+.stat-card .val{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:var(--accent-jp);}
+.stat-card .lbl{font-size:0.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-top:2px;}
+
+.struggle-tag{display:flex;align-items:center;gap:5px;background:rgba(255,107,71,0.1);border:1px solid var(--accent2);border-radius:7px;padding:4px 8px;}
+
+.word-display{font-family:'Syne',sans-serif;font-size:clamp(1.8rem,5.5vw,3.2rem);font-weight:700;letter-spacing:-0.02em;text-align:center;user-select:none;line-height:1;}
+.word-display .orp{color:var(--accent);position:relative;}
+.word-display .orp::after{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:5px;height:5px;background:var(--accent);border-radius:50%;}
+.word-display.flash{animation:bflash 0.08s ease;}
+@keyframes bflash{0%,100%{opacity:1}50%{opacity:0.2}}
+.sample-btn{font-family:'DM Mono',monospace;font-size:0.63rem;padding:4px 11px;border:1px dashed var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.sample-btn:hover{border-color:var(--accent-jp);color:var(--accent-jp);}
+textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.78rem;line-height:1.65;padding:12px;resize:vertical;min-height:100px;outline:none;transition:border-color 0.15s;}
+textarea:focus{border-color:var(--accent);}
+textarea::placeholder{color:var(--muted);}
+.kbd-hint{text-align:center;font-size:0.58rem;color:var(--muted);}
+.kbd-hint kbd{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-family:'DM Mono',monospace;}
+@media(max-width:480px){header{padding:12px 14px;}.app-main{padding:16px 10px 60px;}.kana-cell{width:38px;height:38px;}.kana-glyph{font-size:0.88rem;}.compound-cell{width:46px;}}
+</style>
+</head>
+<body>
+<header>
+  <div id="headerBack" style="display:none"><button class="back-btn" onclick="goHome()">← Home</button></div>
+  <h1>Flash<span style="color:var(--accent)">Read</span></h1>
+  <span class="app-label" id="headerLabel"></span>
+</header>
+
+<!-- HOME -->
+<div class="screen active" id="homeScreen">
+  <div class="main">
+    <div class="home-title">Flash<span>Read</span></div>
+    <div class="home-sub">Choose a learning tool to get started.</div>
+    <div class="app-card bible" onclick="openApp('bible')">
+      <div class="card-icon">📖</div>
+      <div class="card-text"><h2>Bible Reader</h2><p>Speed read Philippians 1 or paste any English text. Word-by-word RSVP with ORP focus point.</p></div>
+      <div class="card-arrow">›</div>
+    </div>
+    <div class="app-card jp" onclick="openApp('jp')">
+      <div class="card-icon">あ</div>
+      <div class="card-text"><h2>Japanese Practice</h2><p>Hiragana & katakana — 4 stages each, compound levels, confused pairs, fluency test.</p></div>
+      <div class="card-arrow">›</div>
+    </div>
+  </div>
+</div>
+
+<!-- BIBLE -->
+<div class="screen" id="bibleScreen">
+  <div class="app-main">
+    <div class="stage-display" style="height:200px;">
+      <div style="position:absolute;top:42%;transform:translateY(-50%);width:100%;display:flex;justify-content:center;align-items:center;pointer-events:none;">
+        <div style="width:24px;height:2px;background:var(--accent);opacity:0.4;"></div>
+        <div style="width:68px;"></div>
+        <div style="width:24px;height:2px;background:var(--accent);opacity:0.4;"></div>
+      </div>
+      <div class="word-display" id="bibleWordDisplay">Press Play</div>
+      <div class="stage-hint" id="bibleHint">ready</div>
+    </div>
+    <div class="progress-row">
+      <span id="bibleProgressText">0 / 0</span>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="bibleProgressBar" style="background:var(--accent);"></div></div>
+      <span id="bibleTimeLeft">—</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <button class="btn" style="background:var(--accent);color:#000;border-color:var(--accent);font-weight:500;min-width:80px;" id="biblePlayBtn" onclick="bibleTogglePlay()" disabled>Play</button>
+      <button class="btn" onclick="bibleReset()">Reset</button>
+      <span style="font-size:0.62rem;color:var(--muted);margin-left:auto;">WPM</span>
+      <input type="range" id="bibleWpmSlider" min="100" max="1000" step="25" value="300" oninput="bibleUpdateWPM(this.value)" style="width:120px;">
+      <span style="font-size:0.95rem;font-weight:500;color:var(--accent);min-width:38px;" id="bibleWpmVal">300</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      <div class="stat-card"><div class="val" style="color:var(--accent)" id="bibleStatWPM">300</div><div class="lbl">WPM</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--accent)" id="bibleStatWords">0</div><div class="lbl">Words</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--accent)" id="bibleStatTime">—</div><div class="lbl">Est. Time</div></div>
+    </div>
+    <div>
+      <label style="font-size:0.63rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px;">Your Text</label>
+      <textarea id="bibleTextInput" placeholder="Paste any text here then hit Play." oninput="bibleOnTextChange()"></textarea>
+      <div style="display:flex;gap:7px;margin-top:7px;flex-wrap:wrap;">
+        <button class="sample-btn" onclick="bibleLoadSample(0)">Philippians 1</button>
+        <button class="sample-btn" onclick="bibleLoadSample(1)">Sample: Science</button>
+        <button class="sample-btn" onclick="bibleLoadSample(2)">Sample: Quote</button>
+      </div>
+    </div>
+    <div class="kbd-hint"><kbd>Space</kbd> play/pause &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> step &nbsp;·&nbsp; <kbd>R</kbd> reset</div>
+  </div>
+</div>
+
+<!-- JAPANESE -->
+<div class="screen" id="jpScreen">
+  <div class="app-main">
+
+    <!-- DRILL VIEW -->
+    <div id="jpDrillView">
+
+      <!-- Flash display -->
+      <div class="stage-display">
+        <div class="kana-char" id="kanaChar">あ</div>
+        <div class="romaji-sub" id="romajiSub"></div>
+        <div class="stage-hint" id="jpHint">select a stage below</div>
+      </div>
+
+      <!-- HINT NAV + BAR -->
+      <div class="hint-bar-wrap">
+        <div class="hint-nav-row">
+          <button class="hint-nav-btn" id="hintPrevBtn" onclick="navLevel(-1)">← Prev</button>
+          <span class="hint-level-label" id="hintLevelLabel">—</span>
+          <button class="hint-nav-btn" id="hintNextBtn" onclick="navLevel(1)">Next →</button>
+        </div>
+        <div class="hint-bar">
+          <div class="hint-chips" id="hintChips"></div>
+          <button class="hint-toggle-btn" onclick="cycleHintMode()" id="hintToggleBtn">
+            <span class="htb-icon">あ</span>
+            <span class="htb-state" id="hintStateLabel">Kana</span>
+          </button>
+        </div>
+        <div style="display:flex;">
+          <div class="struggle-check-row" id="struggleCheckRow"></div>
+          <div class="struggle-check-spacer"></div>
+        </div>
+      </div>
+
+      <!-- session meta -->
+      <div style="display:flex;justify-content:space-between;font-size:0.66rem;color:var(--muted);">
+        <span id="jpLevelText">—</span>
+        <span id="jpCharsSeenText">0 seen</span>
+        <span id="jpElapsedText">0:00</span>
+      </div>
+      <div class="progress-row" style="margin-top:-6px;">
+        <span id="jpProgressText">— / —</span>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="jpProgressBar"></div></div>
+      </div>
+
+      <!-- Controls -->
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+        <button class="btn jp-primary" id="jpPlayPauseBtn" onclick="jpTogglePlayPause()" style="min-width:82px;">Start</button>
+        <button class="btn" onclick="jpGoToStats()">Stats</button>
+        <button class="btn" onclick="jpNewShuffle()">Reshuffle</button>
+        <div style="display:flex;align-items:center;gap:5px;margin-left:auto;">
+          <button class="btn" style="padding:6px 12px;font-size:0.95rem;" onclick="jpNudgeCPM(-5)">−</button>
+          <div style="text-align:center;min-width:48px;">
+            <div style="font-size:1rem;font-weight:500;color:var(--accent-jp);" id="jpCpmDisplay">40</div>
+            <div style="font-size:0.54rem;color:var(--muted);letter-spacing:0.06em;">CPM</div>
+          </div>
+          <button class="btn" style="padding:6px 12px;font-size:0.95rem;" onclick="jpNudgeCPM(5)">+</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap;">Speed</span>
+        <input type="range" id="jpCpmSlider" min="40" max="300" step="5" value="40" oninput="jpUpdateCPM(this.value)">
+      </div>
+
+      <!-- Challenge/Support -->
+      <div class="card-panel">
+        <div class="panel-header">
+          <span class="panel-label">Challenge / Support</span>
+          <span id="splitReadout" style="font-size:0.7rem;color:var(--accent-jp);">100% · hint off</span>
+        </div>
+        <div style="display:flex;height:4px;border-radius:99px;overflow:hidden;">
+          <div id="splitChallenge" style="width:100%;background:var(--accent-jp);transition:width 0.1s;"></div>
+          <div id="splitSupport" style="width:0%;background:#2a3a40;transition:width 0.1s;"></div>
+        </div>
+        <input type="range" id="splitSlider" min="0" max="100" step="5" value="100" oninput="jpUpdateSplit(this.value)">
+        <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:var(--muted);"><span style="color:var(--accent-jp);">← Hint sooner</span><span>Challenge only →</span></div>
+        <div style="font-size:0.64rem;color:var(--muted);line-height:1.5;" id="splitDescription">Romaji will <strong style="color:var(--accent-jp);">never</strong> appear.</div>
+      </div>
+
+      <!-- STAGE SELECTOR -->
+      <div class="card-panel">
+        <div class="panel-header">
+          <span class="panel-label">Stage</span>
+          <span id="stageDescription" style="font-size:0.64rem;color:var(--muted);"></span>
+        </div>
+        <div class="stage-grid" id="stageTabs"></div>
+        <div id="chunkToggleSection" style="display:none;">
+          <div class="toggle-row">
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <span style="font-size:0.68rem;color:var(--text);">Chunking</span>
+              <span style="font-size:0.6rem;color:var(--muted);" id="chunkDesc">ON — 15 base + 6 compound levels</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chunkToggle" checked onchange="toggleChunking()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="level-display" id="levelDisplay" style="display:none;">
+          <div class="ld-info">
+            <div class="ld-title" id="ldTitle">—</div>
+            <div class="ld-desc" id="ldDesc">—</div>
+          </div>
+          <div class="ld-badge" id="ldBadge">1/26</div>
+        </div>
+      </div>
+
+      <!-- GOJUUON GRID -->
+      <div id="gridSection" class="card-panel" style="display:none;">
+        <div class="panel-header">
+          <span class="panel-label" id="gridTitle">Hiragana Chart</span>
+        </div>
+        <div class="gojuuon-wrap" id="gridWrap"></div>
+        <div id="nStandaloneRow" style="display:none;align-items:center;gap:8px;margin-top:4px;"></div>
+        <div id="compoundSection" style="display:none;flex-direction:column;gap:6px;">
+          <div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Compounds</div>
+          <div class="gojuuon-wrap" id="compoundGridWrap"></div>
+        </div>
+        <div id="similarSection" style="display:none;flex-direction:column;gap:6px;">
+          <div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Similar Pairs — click to drill</div>
+          <div class="similar-grid" id="similarGrid"></div>
+        </div>
+      </div>
+
+      <!-- FLUENCY TEST -->
+      <div id="fluencySection" class="card-panel" style="display:none;">
+        <div class="panel-header">
+          <span class="panel-label">Fluency Test — Level Picker</span>
+          <div style="display:flex;gap:6px;">
+            <button class="sample-btn" onclick="fluencySelectAll()">All</button>
+            <button class="sample-btn" onclick="fluencySelectNone()">None</button>
+          </div>
+        </div>
+        <div class="fluency-grid" id="fluencyGrid"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          <span style="font-size:0.64rem;color:var(--muted);white-space:nowrap;">Max chars</span>
+          <input type="range" id="fluencyCountSlider" min="5" max="100" step="5" value="20" oninput="fluencyUpdateCount(this.value)">
+          <span style="color:var(--accent-jp);font-weight:500;min-width:30px;" id="fluencyCountVal">20</span>
+        </div>
+        <button class="btn jp-primary" onclick="fluencyBuildSet()" style="width:100%;">Build & Start →</button>
+      </div>
+
+      <!-- STRUGGLE LIST -->
+      <div class="card-panel">
+        <div class="panel-header">
+          <span class="panel-label">Struggle List</span>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button class="sample-btn" onclick="jpDrillStruggle()" id="drillStruggleBtn" disabled style="color:var(--accent-jp);border-color:var(--accent-jp);">Drill</button>
+            <button class="sample-btn" onclick="jpCopyStruggle()">Copy</button>
+            <button class="sample-btn" onclick="jpClearStruggle()" style="color:var(--accent2);border-color:var(--accent2);">Clear</button>
+          </div>
+        </div>
+        <div id="struggleList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;">
+          <span style="font-size:0.66rem;color:var(--muted);font-style:italic;" id="struggleEmpty">No characters flagged yet.</span>
+        </div>
+        <div style="display:flex;gap:7px;align-items:center;">
+          <input id="struggleImportInput" type="text" placeholder="Paste saved code to restore…" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.66rem;padding:6px 10px;outline:none;">
+          <button class="sample-btn" onclick="jpImportStruggle()" style="color:var(--accent-jp);border-color:var(--accent-jp);">Import</button>
+        </div>
+      </div>
+
+      <div class="kbd-hint"><kbd>Space</kbd> start/pause &nbsp;·&nbsp; <kbd>+</kbd><kbd>−</kbd> speed &nbsp;·&nbsp; <kbd>R</kbd> reshuffle</div>
+    </div><!-- end jpDrillView -->
+
+    <!-- STATS VIEW -->
+    <div id="jpStatsView" style="display:none;flex-direction:column;gap:16px;">
+      <div style="text-align:center;padding:12px 0 2px;">
+        <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent-jp);" id="statsTitle">Stats</div>
+        <div id="jpEndSubtitle" style="font-size:0.7rem;color:var(--muted);margin-top:3px;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;" id="jpEndStats"></div>
+
+      <!-- Stage-level navigation -->
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="statsPrevStageBtn" onclick="statsNavStage(-1)" style="flex:1;">← Prev Stage</button>
+        <button class="btn" id="statsRestartStageBtn" onclick="statsRestartStage()" style="flex:1;">Restart Stage</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn jp-primary" id="statsNextStageBtn" onclick="statsNavStage(1)" style="flex:1;">Next Stage →</button>
+      </div>
+
+      <!-- review chars -->
+      <div class="card-panel">
+        <div style="font-size:0.61rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Tap chars you struggled with</div>
+        <div id="jpReviewChars" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;"></div>
+        <div style="font-size:0.63rem;color:var(--muted);margin-top:3px;">Auto-saved to Struggle List.</div>
+      </div>
+      <button class="btn" style="width:100%;padding:10px;" onclick="jpBackToDrill()">← Back to Drill</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function openApp(app){
+  document.getElementById('homeScreen').classList.remove('active');
+  document.getElementById('headerBack').style.display='block';
+  if(app==='bible'){
+    document.getElementById('bibleScreen').classList.add('active');
+    document.getElementById('headerLabel').textContent='Bible Reader';
+    document.getElementById('headerLabel').style.color='var(--accent)';
+    bibleLoadSample(0);
+  } else {
+    document.getElementById('jpScreen').classList.add('active');
+    document.getElementById('headerLabel').textContent='Japanese Practice';
+    document.getElementById('headerLabel').style.color='var(--accent-jp)';
+    jpInit();
+  }
+}
+function goHome(){
+  biblePause();jpHardStop();
+  ['bibleScreen','jpScreen'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById('homeScreen').classList.add('active');
+  document.getElementById('headerBack').style.display='none';
+}
+
+// ═══════════════════════════════════════
+// BIBLE (unchanged)
+// ═══════════════════════════════════════
+const bibleSamples=[
+  `Paul and Timothy, servants of Christ Jesus, to all God's holy people in Christ Jesus at Philippi, together with the overseers and deacons: Grace and peace to you from God our Father and the Lord Jesus Christ. I thank my God every time I remember you. In all my prayers for all of you, I always pray with joy because of your partnership in the gospel from the first day until now, being confident of this, that he who began a good work in you will carry it on to completion until the day of Christ Jesus. It is right for me to feel this way about all of you, since I have you in my heart and, whether I am in chains or defending and confirming the gospel, all of you share in God's grace with me. God can testify how I long for all of you with the affection of Christ Jesus. And this is my prayer: that your love may abound more and more in knowledge and depth of insight, so that you may be able to discern what is best and may be pure and blameless for the day of Christ, filled with the fruit of righteousness that comes through Jesus Christ — to the glory and praise of God. Now I want you to know, brothers and sisters, that what has happened to me has actually served to advance the gospel. For to me, to live is Christ and to die is gain.`,
+  `The human brain processes written language at remarkable speeds, yet most people read far below their potential. Speed reading techniques like Rapid Serial Visual Presentation train the brain to absorb words without subvocalizing — the habit of silently pronouncing each word.`,
+  `We are what we repeatedly do. Excellence, then, is not an act but a habit. The impediment to action advances action. What stands in the way becomes the way.`
+];
+let bWords=[],bIndex=0,bPlaying=false,bTimer=null,bWPM=300;
+function bOrp(w){const c=w.replace(/[^a-zA-Z0-9]/g,'');if(!c.length)return`<span>${w}</span>`;let idx=c.length<=1?0:c.length<=5?1:c.length<=9?2:3,count=0;for(let i=0;i<w.length;i++)if(/[a-zA-Z0-9]/.test(w[i])){if(count===idx)return`<span>${w.slice(0,i)}</span><span class="orp">${w[i]}</span><span>${w.slice(i+1)}</span>`;count++;}return`<span>${w}</span>`;}
+function bDelay(w){let d=60000/bWPM;if(w.length>8)d*=1.4;if(/[.!?]$/.test(w))d*=1.8;else if(/[,;:]$/.test(w))d*=1.3;return d;}
+function bShow(idx){const el=document.getElementById('bibleWordDisplay');if(idx>=bWords.length){bFinish();return;}el.innerHTML=bOrp(bWords[idx]);el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');document.getElementById('bibleProgressBar').style.width=(bWords.length?((idx+1)/bWords.length*100):0)+'%';document.getElementById('bibleProgressText').textContent=`${idx+1} / ${bWords.length}`;const rem=Math.round((bWords.length-idx-1)/bWPM*60);document.getElementById('bibleTimeLeft').textContent=rem<60?`${rem}s`:`${Math.ceil(rem/60)}m`;}
+function bStep(){if(bIndex>=bWords.length){bFinish();return;}bShow(bIndex);bIndex++;bTimer=setTimeout(bStep,bDelay(bWords[bIndex-1]));}
+function bibleTogglePlay(){bPlaying?biblePause():biblePlay();}
+function biblePlay(){if(!bWords.length)return;bPlaying=true;document.getElementById('biblePlayBtn').textContent='Pause';document.getElementById('bibleHint').textContent='reading';bStep();}
+function biblePause(){bPlaying=false;clearTimeout(bTimer);document.getElementById('biblePlayBtn').textContent='Play';document.getElementById('bibleHint').textContent='paused';}
+function bFinish(){bPlaying=false;clearTimeout(bTimer);document.getElementById('biblePlayBtn').textContent='Play';document.getElementById('bibleHint').textContent='done ✓';document.getElementById('bibleWordDisplay').innerHTML='✓';}
+function bibleReset(){biblePause();bIndex=0;document.getElementById('bibleWordDisplay').innerHTML=bWords.length?bOrp(bWords[0]):'Press Play';document.getElementById('bibleHint').textContent='ready';document.getElementById('bibleProgressBar').style.width='0%';document.getElementById('bibleProgressText').textContent=`0 / ${bWords.length}`;document.getElementById('bibleTimeLeft').textContent=bEst(bWords.length);}
+function bEst(n){const s=Math.round(n/bWPM*60);return s<60?`${s}s`:`${Math.ceil(s/60)}m`;}
+function bibleUpdateWPM(v){bWPM=parseInt(v);document.getElementById('bibleWpmVal').textContent=bWPM;document.getElementById('bibleStatWPM').textContent=bWPM;document.getElementById('bibleStatTime').textContent=bEst(bWords.length);}
+function bibleOnTextChange(){biblePause();const raw=document.getElementById('bibleTextInput').value.trim();bWords=raw.length?raw.split(/\s+/).filter(w=>w.length):[];bIndex=0;document.getElementById('biblePlayBtn').disabled=!bWords.length;document.getElementById('biblePlayBtn').textContent='Play';document.getElementById('bibleStatWords').textContent=bWords.length;document.getElementById('bibleStatTime').textContent=bEst(bWords.length);document.getElementById('bibleWordDisplay').innerHTML=bWords.length?bOrp(bWords[0]):'Press Play';document.getElementById('bibleHint').textContent='ready';document.getElementById('bibleProgressBar').style.width='0%';document.getElementById('bibleProgressText').textContent=`0 / ${bWords.length}`;document.getElementById('bibleTimeLeft').textContent=bEst(bWords.length);}
+function bibleLoadSample(i){document.getElementById('bibleTextInput').value=bibleSamples[i];bibleOnTextChange();}
+
+// ═══════════════════════════════════════
+// JAPANESE DATA
+// ═══════════════════════════════════════
+const ROWS=[
+  {label:'∅',key:'vowel'},{label:'K',key:'k'},{label:'S',key:'s'},{label:'T',key:'t'},
+  {label:'N',key:'n'},{label:'H',key:'h'},{label:'M',key:'m'},{label:'Y',key:'y'},
+  {label:'R',key:'r'},{label:'W',key:'w'},{label:'G',key:'g'},{label:'Z',key:'z'},
+  {label:'D',key:'d'},{label:'B',key:'b'},{label:'P',key:'p'},
+];
+const COLS=['a','i','u','e','o'];
+
+const HIRAGANA={
+  vowel:{a:{k:'あ',r:'a'},i:{k:'い',r:'i'},u:{k:'う',r:'u'},e:{k:'え',r:'e'},o:{k:'お',r:'o'}},
+  k:{a:{k:'か',r:'ka'},i:{k:'き',r:'ki'},u:{k:'く',r:'ku'},e:{k:'け',r:'ke'},o:{k:'こ',r:'ko'}},
+  s:{a:{k:'さ',r:'sa'},i:{k:'し',r:'shi'},u:{k:'す',r:'su'},e:{k:'せ',r:'se'},o:{k:'そ',r:'so'}},
+  t:{a:{k:'た',r:'ta'},i:{k:'ち',r:'chi'},u:{k:'つ',r:'tsu'},e:{k:'て',r:'te'},o:{k:'と',r:'to'}},
+  n:{a:{k:'な',r:'na'},i:{k:'に',r:'ni'},u:{k:'ぬ',r:'nu'},e:{k:'ね',r:'ne'},o:{k:'の',r:'no'}},
+  h:{a:{k:'は',r:'ha'},i:{k:'ひ',r:'hi'},u:{k:'ふ',r:'fu'},e:{k:'へ',r:'he'},o:{k:'ほ',r:'ho'}},
+  m:{a:{k:'ま',r:'ma'},i:{k:'み',r:'mi'},u:{k:'む',r:'mu'},e:{k:'め',r:'me'},o:{k:'も',r:'mo'}},
+  y:{a:{k:'や',r:'ya'},i:null,u:{k:'ゆ',r:'yu'},e:null,o:{k:'よ',r:'yo'}},
+  r:{a:{k:'ら',r:'ra'},i:{k:'り',r:'ri'},u:{k:'る',r:'ru'},e:{k:'れ',r:'re'},o:{k:'ろ',r:'ro'}},
+  w:{a:{k:'わ',r:'wa'},i:null,u:null,e:null,o:{k:'を',r:'wo'}},
+  g:{a:{k:'が',r:'ga'},i:{k:'ぎ',r:'gi'},u:{k:'ぐ',r:'gu'},e:{k:'げ',r:'ge'},o:{k:'ご',r:'go'}},
+  z:{a:{k:'ざ',r:'za'},i:{k:'じ',r:'ji'},u:{k:'ず',r:'zu'},e:{k:'ぜ',r:'ze'},o:{k:'ぞ',r:'zo'}},
+  d:{a:{k:'だ',r:'da'},i:{k:'ぢ',r:'ji'},u:{k:'づ',r:'zu'},e:{k:'で',r:'de'},o:{k:'ど',r:'do'}},
+  b:{a:{k:'ば',r:'ba'},i:{k:'び',r:'bi'},u:{k:'ぶ',r:'bu'},e:{k:'べ',r:'be'},o:{k:'ぼ',r:'bo'}},
+  p:{a:{k:'ぱ',r:'pa'},i:{k:'ぴ',r:'pi'},u:{k:'ぷ',r:'pu'},e:{k:'ぺ',r:'pe'},o:{k:'ぽ',r:'po'}},
+};
+const KATAKANA={
+  vowel:{a:{k:'ア',r:'a'},i:{k:'イ',r:'i'},u:{k:'ウ',r:'u'},e:{k:'エ',r:'e'},o:{k:'オ',r:'o'}},
+  k:{a:{k:'カ',r:'ka'},i:{k:'キ',r:'ki'},u:{k:'ク',r:'ku'},e:{k:'ケ',r:'ke'},o:{k:'コ',r:'ko'}},
+  s:{a:{k:'サ',r:'sa'},i:{k:'シ',r:'shi'},u:{k:'ス',r:'su'},e:{k:'セ',r:'se'},o:{k:'ソ',r:'so'}},
+  t:{a:{k:'タ',r:'ta'},i:{k:'チ',r:'chi'},u:{k:'ツ',r:'tsu'},e:{k:'テ',r:'te'},o:{k:'ト',r:'to'}},
+  n:{a:{k:'ナ',r:'na'},i:{k:'ニ',r:'ni'},u:{k:'ヌ',r:'nu'},e:{k:'ネ',r:'ne'},o:{k:'ノ',r:'no'}},
+  h:{a:{k:'ハ',r:'ha'},i:{k:'ヒ',r:'hi'},u:{k:'フ',r:'fu'},e:{k:'ヘ',r:'he'},o:{k:'ホ',r:'ho'}},
+  m:{a:{k:'マ',r:'ma'},i:{k:'ミ',r:'mi'},u:{k:'ム',r:'mu'},e:{k:'メ',r:'me'},o:{k:'モ',r:'mo'}},
+  y:{a:{k:'ヤ',r:'ya'},i:null,u:{k:'ユ',r:'yu'},e:null,o:{k:'ヨ',r:'yo'}},
+  r:{a:{k:'ラ',r:'ra'},i:{k:'リ',r:'ri'},u:{k:'ル',r:'ru'},e:{k:'レ',r:'re'},o:{k:'ロ',r:'ro'}},
+  w:{a:{k:'ワ',r:'wa'},i:null,u:null,e:null,o:{k:'ヲ',r:'wo'}},
+  g:{a:{k:'ガ',r:'ga'},i:{k:'ギ',r:'gi'},u:{k:'グ',r:'gu'},e:{k:'ゲ',r:'ge'},o:{k:'ゴ',r:'go'}},
+  z:{a:{k:'ザ',r:'za'},i:{k:'ジ',r:'ji'},u:{k:'ズ',r:'zu'},e:{k:'ゼ',r:'ze'},o:{k:'ゾ',r:'zo'}},
+  d:{a:{k:'ダ',r:'da'},i:{k:'ヂ',r:'ji'},u:{k:'ヅ',r:'zu'},e:{k:'デ',r:'de'},o:{k:'ド',r:'do'}},
+  b:{a:{k:'バ',r:'ba'},i:{k:'ビ',r:'bi'},u:{k:'ブ',r:'bu'},e:{k:'ベ',r:'be'},o:{k:'ボ',r:'bo'}},
+  p:{a:{k:'パ',r:'pa'},i:{k:'ピ',r:'pi'},u:{k:'プ',r:'pu'},e:{k:'ペ',r:'pe'},o:{k:'ポ',r:'po'}},
+};
+
+const COMPOUND_CONSONANTS=[
+  {key:'k', label:'K', hr:{ya:{k:'きゃ',r:'kya'},yu:{k:'きゅ',r:'kyu'},yo:{k:'きょ',r:'kyo'}}, kt:{ya:{k:'キャ',r:'kya'},yu:{k:'キュ',r:'kyu'},yo:{k:'キョ',r:'kyo'}}},
+  {key:'s', label:'S', hr:{ya:{k:'しゃ',r:'sha'},yu:{k:'しゅ',r:'shu'},yo:{k:'しょ',r:'sho'}}, kt:{ya:{k:'シャ',r:'sha'},yu:{k:'シュ',r:'shu'},yo:{k:'ショ',r:'sho'}}},
+  {key:'t', label:'T', hr:{ya:{k:'ちゃ',r:'cha'},yu:{k:'ちゅ',r:'chu'},yo:{k:'ちょ',r:'cho'}}, kt:{ya:{k:'チャ',r:'cha'},yu:{k:'チュ',r:'chu'},yo:{k:'チョ',r:'cho'}}},
+  {key:'n', label:'N', hr:{ya:{k:'にゃ',r:'nya'},yu:{k:'にゅ',r:'nyu'},yo:{k:'にょ',r:'nyo'}}, kt:{ya:{k:'ニャ',r:'nya'},yu:{k:'ニュ',r:'nyu'},yo:{k:'ニョ',r:'nyo'}}},
+  {key:'h', label:'H', hr:{ya:{k:'ひゃ',r:'hya'},yu:{k:'ひゅ',r:'hyu'},yo:{k:'ひょ',r:'hyo'}}, kt:{ya:{k:'ヒャ',r:'hya'},yu:{k:'ヒュ',r:'hyu'},yo:{k:'ヒョ',r:'hyo'}}},
+  {key:'m', label:'M', hr:{ya:{k:'みゃ',r:'mya'},yu:{k:'みゅ',r:'myu'},yo:{k:'みょ',r:'myo'}}, kt:{ya:{k:'ミャ',r:'mya'},yu:{k:'ミュ',r:'myu'},yo:{k:'ミョ',r:'myo'}}},
+  {key:'r', label:'R', hr:{ya:{k:'りゃ',r:'rya'},yu:{k:'りゅ',r:'ryu'},yo:{k:'りょ',r:'ryo'}}, kt:{ya:{k:'リャ',r:'rya'},yu:{k:'リュ',r:'ryu'},yo:{k:'リョ',r:'ryo'}}},
+  {key:'g', label:'G', hr:{ya:{k:'ぎゃ',r:'gya'},yu:{k:'ぎゅ',r:'gyu'},yo:{k:'ぎょ',r:'gyo'}}, kt:{ya:{k:'ギャ',r:'gya'},yu:{k:'ギュ',r:'gyu'},yo:{k:'ギョ',r:'gyo'}}},
+  {key:'z', label:'J', hr:{ya:{k:'じゃ',r:'ja'}, yu:{k:'じゅ',r:'ju'}, yo:{k:'じょ',r:'jo'}},  kt:{ya:{k:'ジャ',r:'ja'}, yu:{k:'ジュ',r:'ju'}, yo:{k:'ジョ',r:'jo'}}},
+  {key:'b', label:'B', hr:{ya:{k:'びゃ',r:'bya'},yu:{k:'びゅ',r:'byu'},yo:{k:'びょ',r:'byo'}}, kt:{ya:{k:'ビャ',r:'bya'},yu:{k:'ビュ',r:'byu'},yo:{k:'ビョ',r:'byo'}}},
+  {key:'p', label:'P', hr:{ya:{k:'ぴゃ',r:'pya'},yu:{k:'ぴゅ',r:'pyu'},yo:{k:'ぴょ',r:'pyo'}}, kt:{ya:{k:'ピャ',r:'pya'},yu:{k:'ピュ',r:'pyu'},yo:{k:'ピョ',r:'pyo'}}},
+];
+const COMPOUND_COLS=['ya','yu','yo'];
+
+const SIMILAR_PAIRS_H=[
+  {a:{k:'あ',r:'a'},b:{k:'お',r:'o'},note:'curved tail direction'},
+  {a:{k:'い',r:'i'},b:{k:'り',r:'ri'},note:'stroke count & curve'},
+  {a:{k:'う',r:'u'},b:{k:'つ',r:'tsu'},note:'size & tick'},
+  {a:{k:'え',r:'e'},b:{k:'ぬ',r:'nu'},note:'loop vs open'},
+  {a:{k:'ぬ',r:'nu'},b:{k:'め',r:'me'},note:'loop style'},
+  {a:{k:'ぬ',r:'nu'},b:{k:'る',r:'ru'},note:'tail loop'},
+  {a:{k:'る',r:'ru'},b:{k:'ろ',r:'ro'},note:'tail presence'},
+  {a:{k:'め',r:'me'},b:{k:'ぬ',r:'nu'},note:'crossing stroke'},
+  {a:{k:'は',r:'ha'},b:{k:'ほ',r:'ho'},note:'extra stroke'},
+  {a:{k:'に',r:'ni'},b:{k:'こ',r:'ko'},note:'vertical stroke'},
+  {a:{k:'き',r:'ki'},b:{k:'さ',r:'sa'},note:'top stroke'},
+  {a:{k:'ら',r:'ra'},b:{k:'ち',r:'chi'},note:'curve direction'},
+  {a:{k:'わ',r:'wa'},b:{k:'れ',r:'re'},note:'lower loop'},
+  {a:{k:'ね',r:'ne'},b:{k:'れ',r:'re'},note:'upper left start'},
+  {a:{k:'ね',r:'ne'},b:{k:'わ',r:'wa'},note:'loop style'},
+  {a:{k:'て',r:'te'},b:{k:'で',r:'de'},note:'dakuten'},
+  {a:{k:'へ',r:'he'},b:{k:'べ',r:'be'},note:'dakuten'},
+  {a:{k:'し',r:'shi'},b:{k:'じ',r:'ji'},note:'dakuten on hook'},
+  {a:{k:'そ',r:'so'},b:{k:'ぞ',r:'zo'},note:'dakuten'},
+  {a:{k:'つ',r:'tsu'},b:{k:'づ',r:'zu'},note:'dakuten'},
+];
+const SIMILAR_PAIRS_K=[
+  {a:{k:'ア',r:'a'},b:{k:'マ',r:'ma'},note:'base stroke'},
+  {a:{k:'ウ',r:'u'},b:{k:'ワ',r:'wa'},note:'top stroke'},
+  {a:{k:'エ',r:'e'},b:{k:'エ vs 工',r:''},note:'crossbars'},
+  {a:{k:'カ',r:'ka'},b:{k:'ガ',r:'ga'},note:'dakuten'},
+  {a:{k:'ク',r:'ku'},b:{k:'フ',r:'fu'},note:'angle vs curve'},
+  {a:{k:'コ',r:'ko'},b:{k:'ユ',r:'yu'},note:'open side'},
+  {a:{k:'シ',r:'shi'},b:{k:'ン',r:'n'},note:'stroke direction'},
+  {a:{k:'ソ',r:'so'},b:{k:'ン',r:'n'},note:'tick angle'},
+  {a:{k:'ツ',r:'tsu'},b:{k:'シ',r:'shi'},note:'vertical vs diagonal'},
+  {a:{k:'ノ',r:'no'},b:{k:'ソ',r:'so'},note:'single vs two'},
+  {a:{k:'ヌ',r:'nu'},b:{k:'ス',r:'su'},note:'crossing stroke'},
+  {a:{k:'ネ',r:'ne'},b:{k:'ホ',r:'ho'},note:'lower strokes'},
+  {a:{k:'ラ',r:'ra'},b:{k:'ワ',r:'wa'},note:'lower curve'},
+  {a:{k:'リ',r:'ri'},b:{k:'ソ',r:'so'},note:'stroke lengths'},
+  {a:{k:'レ',r:'re'},b:{k:'ン',r:'n'},note:'angle'},
+  {a:{k:'ロ',r:'ro'},b:{k:'ロ vs 口',r:''},note:'size'},
+  {a:{k:'テ',r:'te'},b:{k:'ア',r:'a'},note:'horizontal bars'},
+  {a:{k:'ナ',r:'na'},b:{k:'ヤ',r:'ya'},note:'second stroke'},
+  {a:{k:'ム',r:'mu'},b:{k:'ム vs 么',r:''},note:'stroke curve'},
+  {a:{k:'ミ',r:'mi'},b:{k:'ニ',r:'ni'},note:'stroke count'},
+];
+
+// ═══════════════════════════════════════
+// STAGE DEFINITIONS
+// ═══════════════════════════════════════
+const STAGE_DEFS=[
+  {id:'h1',label:'H1',script:'hiragana',type:'row',       desc:'Row levels + compounds'},
+  {id:'h2',label:'H2',script:'hiragana',type:'col',       desc:'Column groups'},
+  {id:'h3',label:'H3',script:'hiragana',type:'compound',  desc:'Compound kana'},
+  {id:'h4',label:'H4',script:'hiragana',type:'similar',   desc:'Visual look-alikes'},
+  {id:'k1',label:'K1',script:'katakana',type:'row',       desc:'Row levels + compounds'},
+  {id:'k2',label:'K2',script:'katakana',type:'col',       desc:'Column groups'},
+  {id:'k3',label:'K3',script:'katakana',type:'compound',  desc:'Compound kana'},
+  {id:'k4',label:'K4',script:'katakana',type:'similar',   desc:'Visual look-alikes'},
+  {id:'ft',label:'FT',script:'both',   type:'fluency',    desc:'Fluency test'},
+];
+
+// ═══════════════════════════════════════
+// LEVEL STRUCTURE
+// ═══════════════════════════════════════
+function getPoolForLevel(stageIdx, subLevel){
+  const def=STAGE_DEFS[stageIdx];
+  const isH=def.script==='hiragana';
+  const data=isH?HIRAGANA:KATAKANA;
+  const pairs=isH?SIMILAR_PAIRS_H:SIMILAR_PAIRS_K;
+  const compCons=COMPOUND_CONSONANTS;
+
+  if(def.type==='row'){
+    if(subLevel<14){
+      return getRowLevelPool(data,subLevel);
+    } else {
+      const ci=subLevel-14;
+      const field=isH?'hr':'kt';
+      const row=compCons[ci];
+      return COMPOUND_COLS.map(c=>row[field][c]);
+    }
+  }
+  if(def.type==='col'){
+    return getColLevelPool(data,subLevel);
+  }
+  if(def.type==='compound'){
+    const field=isH?'hr':'kt';
+    const row=compCons[subLevel];
+    return COMPOUND_COLS.map(c=>row[field][c]);
+  }
+  if(def.type==='similar'){
+    const CHUNK_SIZE=5;
+    const start=subLevel*CHUNK_SIZE;
+    const slice=pairs.slice(start,start+CHUNK_SIZE);
+    const seen=new Set();
+    const out=[];
+    slice.forEach(p=>{
+      if(p.a.r&&!seen.has(p.a.k)){seen.add(p.a.k);out.push(p.a);}
+      if(p.b.r&&!seen.has(p.b.k)){seen.add(p.b.k);out.push(p.b);}
+    });
+    return out;
+  }
+  return [];
+}
+
+function getRowLevelPool(data,subLevel){
+  const rowMap=[0,1,2,3,4,5,6,'wyn',8,10,11,12,13,14];
+  if(subLevel>=rowMap.length) return [];
+  const ri=rowMap[subLevel];
+  if(ri==='wyn'){
+    const hd=data;
+    const out=[];
+    const yRow=hd['y'];if(yRow){['a','u','o'].forEach(c=>{if(yRow[c])out.push(yRow[c]);});}
+    const wRow=hd['w'];if(wRow){['a','o'].forEach(c=>{if(wRow[c])out.push(wRow[c]);});}
+    if(data===HIRAGANA) out.push({k:'ん',r:'n'});
+    else out.push({k:'ン',r:'n'});
+    return out;
+  }
+  const row=ROWS[ri];
+  return COLS.map(c=>data[row.key]?data[row.key][c]:null).filter(Boolean);
+}
+
+function getColChunks(colKey){
+  const validRows=ROWS.filter(row=>{
+    const h=HIRAGANA[row.key];
+    const k=KATAKANA[row.key];
+    return (h&&h[colKey])||(k&&k[colKey]);
+  }).map(r=>r.key);
+  const n=validRows.length;
+  if(colKey==='i'||colKey==='e'){
+    const c1=Math.floor(n/3);
+    const c2=Math.floor(n/3);
+    const c3=n-c1-c2;
+    return [validRows.slice(0,c1),validRows.slice(c1,c1+c2),validRows.slice(c1+c2)];
+  }
+  if(colKey==='u'){
+    const baseChunk=Math.floor(n/3);
+    const chunks=[validRows.slice(0,baseChunk),validRows.slice(baseChunk,baseChunk*2),validRows.slice(baseChunk*2)];
+    chunks[2].push('__n__');
+    return chunks;
+  }
+  const c=Math.ceil(n/3);
+  return [validRows.slice(0,c),validRows.slice(c,c*2),validRows.slice(c*2)];
+}
+
+function getColLevelPool(data,subLevel){
+  const compoundStart=chunkingOn?15:5;
+  const compoundColLevels=chunkingOn?6:3;
+  if(subLevel>=compoundStart){
+    const ci=subLevel-compoundStart;
+    return getCompoundColLevel(ci);
+  }
+  if(!chunkingOn){
+    const col=COLS[subLevel];
+    const pool=[];
+    ROWS.forEach(row=>{if(data[row.key]&&data[row.key][col])pool.push(data[row.key][col]);});
+    if(col==='u'){pool.push(data===HIRAGANA?{k:'ん',r:'n'}:{k:'ン',r:'n'});}
+    return pool;
+  } else {
+    const colIdx=Math.floor(subLevel/3);
+    const chunkIdx=subLevel%3;
+    const col=COLS[colIdx];
+    const chunks=getColChunks(col);
+    const rowKeys=chunks[chunkIdx]||[];
+    const pool=[];
+    rowKeys.forEach(rk=>{
+      if(rk==='__n__'){pool.push(data===HIRAGANA?{k:'ん',r:'n'}:{k:'ン',r:'n'});return;}
+      if(data[rk]&&data[rk][col])pool.push(data[rk][col]);
+    });
+    return pool;
+  }
+}
+
+function getCompoundColLevel(ci){
+  const def=STAGE_DEFS[currentStageIdx];
+  const isH=def.script==='hiragana';
+  const field=isH?'hr':'kt';
+  const colKeys=['ya','yu','yo'];
+  if(!chunkingOn){
+    const ck=colKeys[ci];
+    return COMPOUND_CONSONANTS.map(row=>row[field][ck]).filter(Boolean);
+  } else {
+    const colIdx=Math.floor(ci/2);
+    const half=ci%2;
+    const ck=colKeys[colIdx];
+    const half1=COMPOUND_CONSONANTS.slice(0,5);
+    const half2=COMPOUND_CONSONANTS.slice(5);
+    const group=half===0?half1:half2;
+    return group.map(row=>row[field][ck]).filter(Boolean);
+  }
+}
+
+function getTotalLevels(stageIdx){
+  const def=STAGE_DEFS[stageIdx];
+  if(def.type==='row') return 14+11;
+  if(def.type==='col') return chunkingOn?15+6:5+3;
+  if(def.type==='compound') return 11;
+  if(def.type==='similar'){
+    const pairs=def.script==='hiragana'?SIMILAR_PAIRS_H:SIMILAR_PAIRS_K;
+    return Math.ceil(pairs.length/5);
+  }
+  if(def.type==='fluency') return 1;
+  return 1;
+}
+
+function getLevelLabel(stageIdx,subLevel){
+  const def=STAGE_DEFS[stageIdx];
+  const total=getTotalLevels(stageIdx);
+  const badge=`${subLevel+1}/${total}`;
+  if(def.type==='row'){
+    if(subLevel<14){
+      const rowMap=[0,1,2,3,4,5,6,'wyn',8,10,11,12,13,14];
+      const ri=rowMap[subLevel];
+      if(ri==='wyn') return{title:'Y + W + N combined',desc:'ya,yu,yo · wa,wo · n',badge};
+      const row=ROWS[ri];
+      return{title:`${row.label} row`,desc:`Level ${subLevel+1} of ${total}`,badge};
+    } else {
+      const ci=subLevel-14;
+      const cons=COMPOUND_CONSONANTS[ci];
+      return{title:`${cons.label} compounds`,desc:`${cons.label.toLowerCase()}ya · ${cons.label.toLowerCase()}yu · ${cons.label.toLowerCase()}yo`,badge};
+    }
+  }
+  if(def.type==='col'){
+    const compoundStart=chunkingOn?15:5;
+    if(subLevel<compoundStart){
+      if(!chunkingOn){
+        return{title:`"${COLS[subLevel]}" column`,desc:'All rows · Level '+badge,badge};
+      } else {
+        const colIdx=Math.floor(subLevel/3);
+        const chunkIdx=subLevel%3;
+        const col=COLS[colIdx];
+        const chunks=getColChunks(col);
+        const size=chunks[chunkIdx]?chunks[chunkIdx].length:0;
+        return{title:`"${col}" col · part ${chunkIdx+1}`,desc:`${size} chars · Level `+badge,badge};
+      }
+    } else {
+      const ci=subLevel-compoundStart;
+      const colKeys=['ya','yu','yo'];
+      if(!chunkingOn){
+        return{title:`Compounds "${colKeys[ci]}" col`,desc:`All 11 consonants`,badge};
+      } else {
+        const colIdx=Math.floor(ci/2);
+        const half=ci%2;
+        return{title:`Compounds "${colKeys[colIdx]}" col pt${half+1}`,desc:`${half===0?'k/s/t/n/h':'m/r/g/j/b/p'} group`,badge};
+      }
+    }
+  }
+  if(def.type==='compound'){
+    const cons=COMPOUND_CONSONANTS[subLevel];
+    return{title:`${cons.label} compounds`,desc:`${cons.label.toLowerCase()}ya · ${cons.label.toLowerCase()}yu · ${cons.label.toLowerCase()}yo`,badge};
+  }
+  if(def.type==='similar'){
+    return{title:`Similar pairs · Set ${subLevel+1}`,desc:`Visual look-alikes`,badge};
+  }
+  return{title:'Fluency Test',desc:'Custom mix',badge:'∞'};
+}
+
+// ═══════════════════════════════════════
+// JP STATE
+// ═══════════════════════════════════════
+let jpPool=[],jpIndex=0,jpPlaying=false,jpTimer=null,jpRomajiTimer=null;
+let jpCPM=40,jpSplit=100;
+let jpStruggleList=[];
+let jpSessionStart=null,jpCharsSeen=0,jpCycleCount=0,jpPeakCPM=40;
+let jpElapsedTimer=null;
+let currentStageIdx=0;
+let currentSubLevel=0;
+let chunkingOn=true;
+let lockedRedKana=new Set();
+let hintMode=1;
+const HINT_MODES=[
+  {label:'Off',   icon:'○'},
+  {label:'Kana',  icon:'あ'},
+  {label:'Romaji',icon:'ab'},
+  {label:'Both',  icon:'あa'},
+];
+
+// Stage-level tracking
+let stageCompleted = false;
+let stageTotalChars = 0;
+let stageCharsSeen = 0;
+let stageStartTime = null;
+let stageTotalTime = 0;
+
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// ═══════════════════════════════════════
+// HINT BAR
+// ═══════════════════════════════════════
+function cycleHintMode(){
+  hintMode=(hintMode+1)%4;
+  const m=HINT_MODES[hintMode];
+  document.getElementById('hintStateLabel').textContent=m.label;
+  document.getElementById('hintToggleBtn').querySelector('.htb-icon').textContent=m.icon;
+  renderHintChips();
+}
+
+function renderHintChips(){
+  const chipsEl=document.getElementById('hintChips');
+  const checkRow=document.getElementById('struggleCheckRow');
+  chipsEl.innerHTML='';
+  checkRow.innerHTML='';
+  if(!jpPool.length){
+    chipsEl.innerHTML='<span style="font-size:0.66rem;color:var(--muted);font-style:italic;padding:0 4px;">Pool appears here.</span>';
+    return;
+  }
+  const sorted=getPoolInChartOrder();
+  sorted.forEach(entry=>{
+    const chip=document.createElement('div');
+    chip.className='hint-chip'+(lockedRedKana.has(entry.k)?' chip-locked':'');
+    chip.dataset.kana=entry.k;
+    const isStruggle=jpStruggleList.some(s=>s.k===entry.k);
+    if(isStruggle) chip.classList.add('chip-struggle-marked');
+
+    const redLockHandler=()=>{
+      if(lockedRedKana.has(entry.k)){lockedRedKana.delete(entry.k);chip.classList.remove('chip-locked');}
+      else{lockedRedKana.add(entry.k);chip.classList.add('chip-locked');}
+      const charEl=document.getElementById('kanaChar');
+      if(charEl.textContent===entry.k) charEl.classList.toggle('red-locked',lockedRedKana.has(entry.k));
+    };
+
+    if(hintMode===0){
+      chip.classList.add('chip-placeholder-mode');
+      chip.addEventListener('click',redLockHandler);
+      chipsEl.appendChild(chip);
+    } else {
+      if(hintMode===1||hintMode===3){
+        const ks=document.createElement('span');ks.className='chip-kana';ks.textContent=entry.k;chip.appendChild(ks);
+      }
+      if(hintMode===2||hintMode===3){
+        const rs=document.createElement('span');rs.className='chip-rom';rs.textContent=entry.r;chip.appendChild(rs);
+      }
+      const dot=document.createElement('div');
+      dot.className='chip-struggle-dot'+(isStruggle?' visible':'');
+      dot.id='dot_'+entry.k.codePointAt(0);
+      chip.appendChild(dot);
+      chip.addEventListener('click',redLockHandler);
+      chipsEl.appendChild(chip);
+    }
+
+    const checkCell=document.createElement('div');
+    checkCell.className='struggle-check-cell';
+    const cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.checked=isStruggle;
+    cb.title='Add to struggle list';
+    cb.addEventListener('change',()=>{
+      if(cb.checked){if(!jpStruggleList.some(s=>s.k===entry.k))jpStruggleList.push(entry);}
+      else{jpStruggleList=jpStruggleList.filter(s=>s.k!==entry.k);}
+      const dot=document.getElementById('dot_'+entry.k.codePointAt(0));
+      if(dot) dot.classList.toggle('visible',cb.checked);
+      jpRenderStruggleList();jpSaveStruggle();
+    });
+    checkCell.appendChild(cb);
+    checkRow.appendChild(checkCell);
+  });
+}
+
+function getPoolInChartOrder(){
+  const def=STAGE_DEFS[currentStageIdx];
+  const data=def.script==='hiragana'?HIRAGANA:KATAKANA;
+  const order=[];
+  ROWS.forEach(row=>COLS.forEach(col=>{if(data[row.key]&&data[row.key][col])order.push(data[row.key][col].k);}));
+  order.push(def.script==='hiragana'?'ん':'ン');
+  COMPOUND_CONSONANTS.forEach(cc=>{
+    const field=def.script==='hiragana'?'hr':'kt';
+    COMPOUND_COLS.forEach(c=>{order.push(cc[field][c].k);});
+  });
+  const poolMap=new Map(jpPool.map(c=>[c.k,c]));
+  const sorted=[];const seenK=new Set();
+  order.forEach(k=>{if(poolMap.has(k)&&!seenK.has(k)){sorted.push(poolMap.get(k));seenK.add(k);}});
+  jpPool.forEach(c=>{if(!seenK.has(c.k)){sorted.push(c);seenK.add(c.k);}});
+  return sorted;
+}
+
+// ═══════════════════════════════════════
+// LEVEL NAV - Now stage-based
+// ═══════════════════════════════════════
+function navLevel(dir){
+  const total=getTotalLevels(currentStageIdx);
+  const newLevel=currentSubLevel+dir;
+  if(newLevel<0||newLevel>=total){
+    const atEnd=newLevel>=total;
+    if(atEnd){
+      // Stage complete!
+      stageCompleted = true;
+      jpGoToStats();
+      return;
+    }
+    if(newLevel<0){
+      // Wrap to beginning of stage
+      applySubLevel(0);
+      return;
+    }
+    return;
+  }
+  jpHardStop();
+  applySubLevel(newLevel);
+}
+
+function updateNavButtons(){
+  const total=getTotalLevels(currentStageIdx);
+  document.getElementById('hintPrevBtn').disabled=(currentSubLevel===0);
+  document.getElementById('hintNextBtn').disabled=(currentSubLevel===total-1);
+}
+
+// ═══════════════════════════════════════
+// STAGE TABS
+// ═══════════════════════════════════════
+function buildStageTabs(){
+  const el=document.getElementById('stageTabs');
+  el.innerHTML='';
+  const hLabel=document.createElement('div');
+  hLabel.className='script-row-label';hLabel.style.gridColumn='1/-1';hLabel.textContent='Hiragana';
+  el.appendChild(hLabel);
+  [0,1,2,3].forEach(i=>{
+    el.appendChild(makeTabBtn(i));
+  });
+  const kLabel=document.createElement('div');
+  kLabel.className='script-row-label';kLabel.style.gridColumn='1/-1';kLabel.textContent='Katakana';
+  el.appendChild(kLabel);
+  [4,5,6,7].forEach(i=>{
+    el.appendChild(makeTabBtn(i));
+  });
+  const ftLabel=document.createElement('div');
+  ftLabel.className='script-row-label';ftLabel.style.gridColumn='1/-1';ftLabel.textContent='Test';
+  el.appendChild(ftLabel);
+  el.appendChild(makeTabBtn(8));
+}
+function makeTabBtn(i){
+  const def=STAGE_DEFS[i];
+  const btn=document.createElement('button');
+  btn.className='stage-tab'+(i===currentStageIdx?' active':'');
+  btn.textContent=def.label;
+  btn.title=def.desc;
+  btn.onclick=()=>selectStage(i);
+  return btn;
+}
+
+function selectStage(idx){
+  currentStageIdx=idx;
+  currentSubLevel=0;
+  lockedRedKana.clear();
+  stageCompleted = false;
+  stageTotalChars = 0;
+  stageCharsSeen = 0;
+  stageTotalTime = 0;
+  stageStartTime = null;
+  
+  buildStageTabs();
+  const def=STAGE_DEFS[idx];
+  document.getElementById('stageDescription').textContent=def.desc;
+  const isFluency=def.type==='fluency';
+  const isCol=def.type==='col';
+  const isSimilar=def.type==='similar';
+
+  document.getElementById('chunkToggleSection').style.display=isCol?'block':'none';
+  document.getElementById('levelDisplay').style.display=isFluency?'none':'flex';
+  document.getElementById('gridSection').style.display=(!isFluency)?'flex':'none';
+  document.getElementById('fluencySection').style.display=isFluency?'flex':'none';
+
+  const showCompounds=def.type==='row'||def.type==='col';
+  document.getElementById('compoundSection').style.display=showCompounds?'flex':'none';
+  document.getElementById('similarSection').style.display=isSimilar?'flex':'none';
+
+  if(!isFluency){
+    document.getElementById('gridTitle').textContent=(def.script==='hiragana'?'Hiragana':'Katakana')+' Chart';
+    buildGrid(def.script);
+    if(isSimilar) buildSimilarGrid(def.script);
+    applySubLevel(0);
+  } else {
+    buildFluencyGrid();
+    document.getElementById('jpHint').textContent='build a set below';
+    document.getElementById('hintLevelLabel').textContent='Fluency Test';
+  }
+}
+
+function toggleChunking(){
+  chunkingOn=document.getElementById('chunkToggle').checked;
+  document.getElementById('chunkDesc').textContent=chunkingOn
+    ?'ON — 15 base + 6 compound levels'
+    :'OFF — 5 base + 3 compound levels';
+  currentSubLevel=0;
+  applySubLevel(0);
+}
+
+// ═══════════════════════════════════════
+// APPLY SUB-LEVEL
+// ═══════════════════════════════════════
+function applySubLevel(subLevel){
+  currentSubLevel=subLevel;
+  const def=STAGE_DEFS[currentStageIdx];
+  const pool=getPoolForLevel(currentStageIdx,subLevel);
+  jpPool=shuffle(pool.filter(Boolean));
+  const total=getTotalLevels(currentStageIdx);
+  const lbl=getLevelLabel(currentStageIdx,subLevel);
+  document.getElementById('ldTitle').textContent=lbl.title;
+  document.getElementById('ldDesc').textContent=lbl.desc;
+  document.getElementById('ldBadge').textContent=lbl.badge;
+  document.getElementById('jpLevelText').textContent=`${STAGE_DEFS[currentStageIdx].label} · Level ${subLevel+1}/${total}`;
+  document.getElementById('hintLevelLabel').textContent=`${STAGE_DEFS[currentStageIdx].label} · ${lbl.title}`;
+  jpIndex=0;
+  renderHintChips();
+  highlightGridForLevel(subLevel);
+  updateNavButtons();
+  if(jpPool.length) jpShowChar(0);
+  document.getElementById('jpHint').textContent='ready';
+}
+
+function highlightGridForLevel(subLevel){
+  document.querySelectorAll('.kana-cell:not(.empty),.compound-cell,.pair-card').forEach(c=>{
+    c.classList.remove('in-level');
+  });
+  if(!jpPool.length) return;
+  const kanaSet=new Set(jpPool.map(c=>c.k));
+  document.querySelectorAll('.kana-cell:not(.empty)').forEach(cell=>{
+    const kEl=cell.querySelector('.kana-glyph');
+    if(kEl&&kanaSet.has(kEl.textContent)) cell.classList.add('in-level');
+  });
+  document.querySelectorAll('.compound-cell').forEach(cell=>{
+    const kEl=cell.querySelector('.kana-glyph');
+    if(kEl&&kanaSet.has(kEl.textContent)) cell.classList.add('in-level');
+  });
+  document.querySelectorAll('.pair-card').forEach(card=>{
+    const kanas=card.querySelectorAll('.pair-kana');
+    kanas.forEach(kEl=>{if(kanaSet.has(kEl.textContent))card.classList.add('in-level');});
+  });
+}
+
+// ═══════════════════════════════════════
+// GOJUUON GRID
+// ═══════════════════════════════════════
+let selectedRowKey=null;
+
+function buildGrid(script){
+  const data=script==='hiragana'?HIRAGANA:KATAKANA;
+  const wrap=document.getElementById('gridWrap');
+  wrap.innerHTML='';
+  selectedRowKey=null;
+  const table=document.createElement('table');
+  table.className='gojuuon';
+  const thead=document.createElement('thead');
+  const hrow=document.createElement('tr');
+  const th0=document.createElement('th');th0.colSpan=2;hrow.appendChild(th0);
+  COLS.forEach(col=>{
+    const th=document.createElement('th');th.textContent=col;hrow.appendChild(th);
+  });
+  thead.appendChild(hrow);table.appendChild(thead);
+  const tbody=document.createElement('tbody');
+  ROWS.forEach(row=>{
+    const tr=document.createElement('tr');
+    const tdlbl=document.createElement('td');
+    tdlbl.innerHTML=`<div class="row-label-cell" data-rowkey="${row.key}">${row.label}</div>`;
+    tdlbl.querySelector('.row-label-cell').onclick=()=>toggleRowHighlight(row.key,script);
+    tr.appendChild(tdlbl);
+    const tdsp=document.createElement('td');tdsp.style.width='4px';tdsp.style.background='var(--bg)';tr.appendChild(tdsp);
+    COLS.forEach(col=>{
+      const td=document.createElement('td');td.style.padding='0';
+      const entry=data[row.key]?data[row.key][col]:null;
+      if(!entry){
+        const empty=document.createElement('div');empty.className='kana-cell empty';td.appendChild(empty);
+      } else {
+        const cell=document.createElement('div');
+        cell.className='kana-cell';
+        cell.dataset.row=row.key;cell.dataset.col=col;
+        cell.innerHTML=`<span class="kana-glyph">${entry.k}</span><span class="kana-rom">${entry.r}</span>`;
+        cell.onclick=()=>toggleCellHighlight(cell);
+        td.appendChild(cell);
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  const nEntry=script==='hiragana'?{k:'ん',r:'n'}:{k:'ン',r:'n'};
+  const nDiv=document.createElement('div');
+  nDiv.style.cssText='display:flex;align-items:center;gap:8px;margin-top:6px;';
+  const nCell=document.createElement('div');
+  nCell.className='kana-cell';nCell.style.cssText='width:46px;height:44px;';
+  nCell.innerHTML=`<span class="kana-glyph">${nEntry.k}</span><span class="kana-rom">${nEntry.r}</span>`;
+  nCell.onclick=()=>toggleCellHighlight(nCell);
+  nDiv.appendChild(nCell);
+  const nLbl=document.createElement('span');nLbl.textContent='standalone n';nLbl.style.cssText='font-size:0.61rem;color:var(--muted);';
+  nDiv.appendChild(nLbl);
+  wrap.appendChild(nDiv);
+
+  buildCompoundGrid(script);
+}
+
+function toggleRowHighlight(rowKey,script){
+  const allCells=document.querySelectorAll(`.kana-cell[data-row="${rowKey}"]`);
+  const lbl=document.querySelector(`.row-label-cell[data-rowkey="${rowKey}"]`);
+  const isActive=lbl&&lbl.classList.contains('row-active');
+  if(isActive){
+    allCells.forEach(c=>c.classList.remove('row-selected'));
+    if(lbl)lbl.classList.remove('row-active');
+  } else {
+    allCells.forEach(c=>c.classList.add('row-selected'));
+    if(lbl)lbl.classList.add('row-active');
+  }
+}
+
+function toggleCellHighlight(cell){
+  cell.classList.toggle('row-selected');
+}
+
+function buildCompoundGrid(script){
+  const field=script==='hiragana'?'hr':'kt';
+  const wrap=document.getElementById('compoundGridWrap');
+  wrap.innerHTML='';
+  const table=document.createElement('table');
+  table.className='compound-grid-table';
+  const thead=document.createElement('thead');
+  const hr=document.createElement('tr');
+  const th0=document.createElement('th');th0.textContent='';hr.appendChild(th0);
+  COMPOUND_COLS.forEach(c=>{
+    const th=document.createElement('th');th.textContent=c;hr.appendChild(th);
+  });
+  thead.appendChild(hr);table.appendChild(thead);
+  const tbody=document.createElement('tbody');
+  COMPOUND_CONSONANTS.forEach(cc=>{
+    const tr=document.createElement('tr');
+    const tdlbl=document.createElement('td');
+    tdlbl.style.cssText='padding:2px 6px;background:var(--bg);color:var(--muted);font-size:0.58rem;';
+    tdlbl.textContent=cc.label;tr.appendChild(tdlbl);
+    COMPOUND_COLS.forEach(ck=>{
+      const td=document.createElement('td');td.style.padding='0';
+      const entry=cc[field][ck];
+      const cell=document.createElement('div');
+      cell.className='compound-cell';
+      cell.innerHTML=`<span class="kana-glyph">${entry.k}</span><span class="kana-rom" style="font-size:0.44rem;color:var(--muted);">${entry.r}</span>`;
+      cell.onclick=()=>toggleCellHighlight(cell);
+      td.appendChild(cell);tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+}
+
+function buildSimilarGrid(script){
+  const pairs=script==='hiragana'?SIMILAR_PAIRS_H:SIMILAR_PAIRS_K;
+  const grid=document.getElementById('similarGrid');
+  grid.innerHTML='';
+  pairs.forEach((pair,idx)=>{
+    if(!pair.a.r||!pair.b.r) return;
+    const card=document.createElement('div');
+    card.className='pair-card';
+    card.title=pair.note;
+    card.innerHTML=`<span class="pair-kana">${pair.a.k}</span><span class="pair-sep">/</span><span class="pair-kana">${pair.b.k}</span><div style="display:flex;flex-direction:column;margin-left:4px;"><span class="pair-rom">${pair.a.r}</span><span class="pair-rom">${pair.b.r}</span></div>`;
+    card.onclick=()=>card.classList.toggle('row-selected');
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════
+// FLUENCY TEST
+// ═══════════════════════════════════════
+let fluencySelectedLevels=new Set();
+let fluencyMaxCount=20;
+
+function buildFluencyGrid(){
+  const grid=document.getElementById('fluencyGrid');
+  grid.innerHTML='';
+  const hLabel=document.createElement('div');hLabel.className='fluency-script-label';hLabel.textContent='Hiragana Stages';
+  grid.appendChild(hLabel);
+  [0,1,2,3].forEach(si=>{
+    const total=getTotalLevels(si);
+    for(let li=0;li<total;li++){
+      const key=`${si}:${li}`;
+      const lbl=getLevelLabel(si,li);
+      const btn=document.createElement('button');
+      btn.className='fluency-level-btn'+(fluencySelectedLevels.has(key)?' selected':'');
+      btn.textContent=`${STAGE_DEFS[si].label} L${li+1}`;
+      btn.title=lbl.title;
+      btn.onclick=()=>{
+        if(fluencySelectedLevels.has(key))fluencySelectedLevels.delete(key);
+        else fluencySelectedLevels.add(key);
+        btn.classList.toggle('selected',fluencySelectedLevels.has(key));
+      };
+      grid.appendChild(btn);
+    }
+  });
+  const kLabel=document.createElement('div');kLabel.className='fluency-script-label';kLabel.textContent='Katakana Stages';
+  grid.appendChild(kLabel);
+  [4,5,6,7].forEach(si=>{
+    const total=getTotalLevels(si);
+    for(let li=0;li<total;li++){
+      const key=`${si}:${li}`;
+      const lbl=getLevelLabel(si,li);
+      const btn=document.createElement('button');
+      btn.className='fluency-level-btn'+(fluencySelectedLevels.has(key)?' selected':'');
+      btn.textContent=`${STAGE_DEFS[si].label} L${li+1}`;
+      btn.title=lbl.title;
+      btn.onclick=()=>{
+        if(fluencySelectedLevels.has(key))fluencySelectedLevels.delete(key);
+        else fluencySelectedLevels.add(key);
+        btn.classList.toggle('selected',fluencySelectedLevels.has(key));
+      };
+      grid.appendChild(btn);
+    }
+  });
+}
+
+function fluencySelectAll(){
+  [0,1,2,3,4,5,6,7].forEach(si=>{
+    const total=getTotalLevels(si);
+    for(let li=0;li<total;li++) fluencySelectedLevels.add(`${si}:${li}`);
+  });
+  buildFluencyGrid();
+}
+function fluencySelectNone(){fluencySelectedLevels.clear();buildFluencyGrid();}
+function fluencyUpdateCount(v){fluencyMaxCount=parseInt(v);document.getElementById('fluencyCountVal').textContent=v;}
+function fluencyBuildSet(){
+  if(!fluencySelectedLevels.size){alert('Select at least one level.');return;}
+  const seen=new Set();const pool=[];
+  fluencySelectedLevels.forEach(key=>{
+    const [si,li]=key.split(':').map(Number);
+    getPoolForLevel(si,li).filter(Boolean).forEach(c=>{
+      if(!seen.has(c.k)){seen.add(c.k);pool.push(c);}
+    });
+  });
+  jpPool=shuffle(pool).slice(0,fluencyMaxCount);
+  jpIndex=0;
+  renderHintChips();
+  if(jpPool.length) jpShowChar(0);
+  document.getElementById('jpHint').textContent=`${jpPool.length} chars — ready`;
+  document.getElementById('jpLevelText').textContent='Fluency Test';
+  document.getElementById('hintLevelLabel').textContent='Fluency Test';
+}
+
+// ═══════════════════════════════════════
+// PLAYBACK - Stage-based tracking
+// ═══════════════════════════════════════
+function jpGetChar(globalIdx){
+  if(!jpPool.length)return{k:'—',r:''};
+  const pos=globalIdx%jpPool.length;
+  if(pos===0&&globalIdx>0){jpPool=shuffle(jpPool);jpCycleCount++;}
+  return jpPool[pos];
+}
+
+function jpShowChar(globalIdx){
+  if(!jpPool.length){document.getElementById('kanaChar').textContent='—';return;}
+  const entry=jpGetChar(globalIdx);
+  const charEl=document.getElementById('kanaChar');
+  const romajiEl=document.getElementById('romajiSub');
+  charEl.textContent=entry.k;
+  charEl.classList.remove('flash');void charEl.offsetWidth;charEl.classList.add('flash');
+  charEl.classList.toggle('red-locked',lockedRedKana.has(entry.k));
+  romajiEl.textContent='';
+  clearTimeout(jpRomajiTimer);
+  if(jpSplit<100){
+    const delay=(60000/jpCPM)*(jpSplit/100);
+    jpRomajiTimer=setTimeout(()=>{romajiEl.textContent=entry.r;},delay);
+  }
+  const pos=globalIdx%(jpPool.length||1);
+  document.getElementById('jpProgressBar').style.width=jpPool.length?((pos+1)/jpPool.length*100)+'%':'0%';
+  document.getElementById('jpProgressText').textContent=`${pos+1} / ${jpPool.length}`;
+  
+  // Track stage progress
+  stageCharsSeen++;
+  document.getElementById('jpCharsSeenText').textContent=`${stageCharsSeen} seen`;
+}
+
+function jpTogglePlayPause(){
+  if(jpPlaying)jpPause();
+  else{if(!jpPool.length){document.getElementById('jpHint').textContent='select a stage to begin';return;}jpResume();}
+}
+
+function jpResume(){
+  jpPlaying=true;
+  if(!stageStartTime){
+    stageStartTime = Date.now();
+    stageTotalChars = 0;
+    // Count total chars in stage
+    const def=STAGE_DEFS[currentStageIdx];
+    if(def.type !== 'fluency'){
+      const totalLevels = getTotalLevels(currentStageIdx);
+      const seen = new Set();
+      for(let i=0; i<totalLevels; i++){
+        getPoolForLevel(currentStageIdx, i).forEach(c=>{
+          if(!seen.has(c.k)){seen.add(c.k);stageTotalChars++;}
+        });
+      }
+    } else {
+      stageTotalChars = jpPool.length;
+    }
+  }
+  jpPeakCPM=Math.max(jpPeakCPM,jpCPM);
+  document.getElementById('jpPlayPauseBtn').textContent='Pause';
+  document.getElementById('jpHint').textContent='drilling';
+  clearInterval(jpElapsedTimer);
+  jpElapsedTimer=setInterval(()=>{
+    if(!stageStartTime)return;
+    const s=Math.floor((Date.now()-stageStartTime)/1000);
+    document.getElementById('jpElapsedText').textContent=`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+  },500);
+  jpStep();
+}
+
+function jpStep(){
+  if(!jpPlaying)return;
+  jpShowChar(jpIndex);
+  jpCharsSeen++;
+  jpPeakCPM=Math.max(jpPeakCPM,jpCPM);
+  jpIndex++;
+  jpTimer=setTimeout(jpStep,60000/jpCPM);
+}
+
+function jpPause(){
+  jpPlaying=false;
+  clearTimeout(jpTimer);clearTimeout(jpRomajiTimer);clearInterval(jpElapsedTimer);
+  document.getElementById('jpPlayPauseBtn').textContent='Start';
+  document.getElementById('jpHint').textContent='paused';
+}
+
+function jpHardStop(){
+  jpPlaying=false;
+  clearTimeout(jpTimer);clearTimeout(jpRomajiTimer);clearInterval(jpElapsedTimer);
+  document.getElementById('jpPlayPauseBtn').textContent='Start';
+}
+
+function jpGoToStats(){
+  jpHardStop();
+  // Calculate stage stats
+  if(stageStartTime){
+    stageTotalTime = Math.floor((Date.now() - stageStartTime) / 1000);
+  }
+  jpShowStatsView();
+}
+
+function jpShowStatsView(){
+  const m=Math.floor(stageTotalTime/60),s=stageTotalTime%60;
+  const def=STAGE_DEFS[currentStageIdx];
+  const totalLevels = getTotalLevels(currentStageIdx);
+  const stageLabel = def.type==='fluency' ? 'Fluency Test' : `${def.label} · ${totalLevels} levels`;
+  
+  document.getElementById('statsTitle').textContent='Stage Complete! · ' + stageLabel;
+  document.getElementById('jpEndSubtitle').textContent=`Peak ${jpPeakCPM} CPM · ${stageCharsSeen} chars seen · ${stageTotalChars} total chars in stage`;
+  
+  const charsSeenPercent = stageTotalChars > 0 ? Math.round((stageCharsSeen / stageTotalChars) * 100) : 0;
+  const levelsCompleted = currentSubLevel + 1;
+  
+  document.getElementById('jpEndStats').innerHTML=[
+    {val:m>0?`${m}m ${s}s`:`${s}s`,lbl:'Time in Stage'},
+    {val:stageCharsSeen,lbl:'Chars Seen'},
+    {val:charsSeenPercent+'%',lbl:'Stage Coverage'},
+    {val:levelsCompleted+'/'+totalLevels,lbl:'Levels Completed'},
+    {val:jpPeakCPM,lbl:'Peak CPM'},
+  ].map(s=>`<div class="stat-card"><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>`).join('');
+
+  // Navigation - stage-based
+  const isLastStage = currentStageIdx >= STAGE_DEFS.length - 1 || currentStageIdx === 8;
+  const isFirstStage = currentStageIdx === 0;
+  
+  document.getElementById('statsPrevStageBtn').style.display=!isFirstStage?'block':'none';
+  document.getElementById('statsRestartStageBtn').style.display='block';
+  document.getElementById('statsNextStageBtn').style.display=!isLastStage?'block':'none';
+
+  // Review chars
+  const reviewEl=document.getElementById('jpReviewChars');
+  reviewEl.innerHTML='';
+  const sorted=getPoolInChartOrder();
+  sorted.forEach(entry=>{
+    const isS=jpStruggleList.some(s=>s.k===entry.k);
+    const btn=document.createElement('button');
+    btn._flagged=isS;
+    btn.style.cssText=`font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;width:50px;height:56px;border-radius:9px;border:2px solid ${isS?'var(--accent2)':'var(--border)'};background:${isS?'rgba(255,107,71,0.15)':'var(--surface)'};color:${isS?'var(--accent2)':'var(--text)'};cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;`;
+    btn.innerHTML=`<span>${entry.k}</span><span style="font-family:'DM Mono',monospace;font-size:0.46rem;color:var(--muted);">${entry.r}</span>`;
+    btn.onclick=()=>{
+      btn._flagged=!btn._flagged;
+      btn.style.borderColor=btn._flagged?'var(--accent2)':'var(--border)';
+      btn.style.background=btn._flagged?'rgba(255,107,71,0.15)':'var(--surface)';
+      btn.style.color=btn._flagged?'var(--accent2)':'var(--text)';
+      if(btn._flagged){if(!jpStruggleList.some(s=>s.k===entry.k))jpStruggleList.push(entry);}
+      else{jpStruggleList=jpStruggleList.filter(s=>s.k!==entry.k);}
+      jpRenderStruggleList();jpSaveStruggle();
+    };
+    reviewEl.appendChild(btn);
+  });
+
+  document.getElementById('jpDrillView').style.display='none';
+  document.getElementById('jpStatsView').style.display='flex';
+}
+
+function statsNavStage(dir){
+  const newStage = currentStageIdx + dir;
+  if(newStage >= 0 && newStage < STAGE_DEFS.length){
+    selectStage(newStage);
+  }
+  jpBackToDrill();
+}
+
+function statsRestartStage(){
+  const def=STAGE_DEFS[currentStageIdx];
+  if(def.type === 'fluency'){
+    fluencyBuildSet();
+  } else {
+    // Rebuild the entire stage pool
+    const totalLevels = getTotalLevels(currentStageIdx);
+    const seen = new Set();
+    const allChars = [];
+    for(let i=0; i<totalLevels; i++){
+      getPoolForLevel(currentStageIdx, i).forEach(c=>{
+        if(!seen.has(c.k)){seen.add(c.k);allChars.push(c);}
+      });
+    }
+    jpPool = shuffle(allChars);
+    jpIndex = 0;
+    stageCharsSeen = 0;
+    stageTotalChars = allChars.length;
+    stageStartTime = null;
+    stageTotalTime = 0;
+    stageCompleted = false;
+    renderHintChips();
+    if(jpPool.length) jpShowChar(0);
+  }
+  jpBackToDrill();
+}
+
+function jpBackToDrill(){
+  document.getElementById('jpDrillView').style.display='block';
+  document.getElementById('jpStatsView').style.display='none';
+  document.getElementById('jpPlayPauseBtn').textContent='Start';
+  document.getElementById('jpHint').textContent='ready';
+  if(jpPool.length) jpShowChar(0);
+}
+
+function jpNewShuffle(){
+  jpHardStop();
+  const def=STAGE_DEFS[currentStageIdx];
+  if(def.type==='fluency'){fluencyBuildSet();return;}
+  jpPool=shuffle(getPoolForLevel(currentStageIdx,currentSubLevel).filter(Boolean));
+  jpIndex=0;renderHintChips();if(jpPool.length)jpShowChar(0);
+  jpCharsSeen=0;jpCycleCount=0;jpPeakCPM=jpCPM;
+  document.getElementById('jpCharsSeenText').textContent='0 seen';
+  document.getElementById('jpElapsedText').textContent='0:00';
+  document.getElementById('jpPlayPauseBtn').textContent='Start';
+  document.getElementById('jpProgressBar').style.width='0%';
+  document.getElementById('romajiSub').textContent='';
+  document.getElementById('jpHint').textContent='ready';
+}
+
+function jpUpdateCPM(v){jpCPM=parseInt(v);document.getElementById('jpCpmSlider').value=jpCPM;document.getElementById('jpCpmDisplay').textContent=jpCPM;}
+function jpNudgeCPM(d){jpCPM=Math.max(40,Math.min(300,jpCPM+d));document.getElementById('jpCpmSlider').value=jpCPM;document.getElementById('jpCpmDisplay').textContent=jpCPM;}
+function jpUpdateSplit(v){
+  jpSplit=parseInt(v);
+  document.getElementById('splitChallenge').style.width=jpSplit+'%';
+  document.getElementById('splitSupport').style.width=(100-jpSplit)+'%';
+  document.getElementById('splitReadout').textContent=jpSplit>=100?'100% · hint off':`${jpSplit}% · ${100-jpSplit}%`;
+  document.getElementById('splitDescription').innerHTML=jpSplit>=100?`Romaji will <strong style="color:var(--accent-jp);">never</strong> appear.`:`Romaji snaps in after <strong style="color:var(--accent-jp);">${jpSplit}%</strong> of the beat.`;
+}
+
+// ═══════════════════════════════════════
+// STRUGGLE LIST
+// ═══════════════════════════════════════
+function jpRenderStruggleList(){
+  const el=document.getElementById('struggleList');
+  const emptyEl=document.getElementById('struggleEmpty');
+  const drillBtn=document.getElementById('drillStruggleBtn');
+  el.innerHTML='';
+  if(!jpStruggleList.length){el.appendChild(emptyEl);emptyEl.style.display='inline';drillBtn.disabled=true;return;}
+  emptyEl.style.display='none';
+  jpStruggleList.forEach(entry=>{
+    const tag=document.createElement('div');tag.className='struggle-tag';
+    tag.innerHTML=`<span style="font-family:'Syne',sans-serif;font-size:1.1rem;color:var(--accent2);">${entry.k}</span><span style="font-size:0.58rem;color:var(--muted);">${entry.r}</span><button onclick="jpRemoveStruggle('${entry.k}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.72rem;padding:0 2px;">✕</button>`;
+    el.appendChild(tag);
+  });
+  drillBtn.disabled=false;
+}
+function jpRemoveStruggle(k){jpStruggleList=jpStruggleList.filter(s=>s.k!==k);jpRenderStruggleList();jpSaveStruggle();renderHintChips();}
+function jpClearStruggle(){jpStruggleList=[];jpRenderStruggleList();jpSaveStruggle();renderHintChips();}
+function jpDrillStruggle(){
+  if(!jpStruggleList.length)return;
+  jpPool=shuffle([...jpStruggleList]);jpIndex=0;jpCycleCount=0;
+  document.getElementById('jpProgressText').textContent=`0 / ${jpPool.length}`;
+  document.getElementById('jpProgressBar').style.width='0%';
+  document.getElementById('romajiSub').textContent='';
+  renderHintChips();
+  if(jpPool.length)jpShowChar(0);
+  document.getElementById('jpHint').textContent='struggle drill — ready';
+}
+function jpSaveStruggle(){try{localStorage.setItem('flashread_struggle',JSON.stringify(jpStruggleList));}catch(e){}}
+function jpLoadStruggle(){try{const s=localStorage.getItem('flashread_struggle');if(s){jpStruggleList=JSON.parse(s);jpRenderStruggleList();}}catch(e){}}
+function jpCopyStruggle(){
+  if(!jpStruggleList.length){alert('Struggle list is empty.');return;}
+  const code='FR:'+jpStruggleList.map(c=>`${c.k}=${c.r}`).join(',');
+  navigator.clipboard.writeText(code).then(()=>{
+    const btn=event.currentTarget;const orig=btn.textContent;btn.textContent='Copied!';setTimeout(()=>{btn.textContent=orig;},1500);
+  }).catch(()=>{prompt('Copy this:',code);});
+}
+function jpImportStruggle(){
+  const raw=document.getElementById('struggleImportInput').value.trim();
+  if(!raw.startsWith('FR:')){alert('Invalid code — must start with FR:');return;}
+  try{
+    const pairs=raw.slice(3).split(',').map(p=>{const[k,r]=p.split('=');return{k,r};}).filter(c=>c.k&&c.r);
+    pairs.forEach(c=>{if(!jpStruggleList.some(s=>s.k===c.k))jpStruggleList.push(c);});
+    jpRenderStruggleList();jpSaveStruggle();document.getElementById('struggleImportInput').value='';
+  }catch(e){alert('Could not parse the code.');}
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+function jpInit(){
+  jpLoadStruggle();
+  buildStageTabs();
+  selectStage(0);
+}
+
+// ═══════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  const tag=document.activeElement.tagName;
+  if(tag==='TEXTAREA'||tag==='INPUT'||tag==='SELECT') return;
+  const bA=document.getElementById('bibleScreen').classList.contains('active');
+  const jA=document.getElementById('jpScreen').classList.contains('active');
+  if(e.code==='Space'){e.preventDefault();if(bA)bibleTogglePlay();if(jA)jpTogglePlayPause();}
+  if(e.code==='ArrowRight'){if(bA&&!bPlaying){bIndex=Math.min(bIndex+1,bWords.length-1);bShow(bIndex);}if(jA&&!jpPlaying){jpIndex++;jpShowChar(jpIndex);}}
+  if(e.code==='ArrowLeft'){if(bA&&!bPlaying){bIndex=Math.max(bIndex-1,0);bShow(bIndex);}if(jA&&!jpPlaying){jpIndex=Math.max(jpIndex-1,0);jpShowChar(jpIndex);}}
+  if(e.code==='KeyR'){if(bA)bibleReset();if(jA)jpNewShuffle();}
+  if(e.key==='+'||e.key==='='){if(jA)jpNudgeCPM(5);}
+  if(e.key==='-'){if(jA)jpNudgeCPM(-5);}
+});
+</script>
+</body>
+</html>
