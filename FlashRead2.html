@@ -1758,77 +1758,114 @@ function sfBuildSetSelector() {
 
 function sfSelectSet(key, type) {
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfStop();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   let cards;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   if (type === 'preload') {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     cards = SF_PRELOADED_SETS[key].cards;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     sfState.currentSetName = SF_PRELOADED_SETS[key].label;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   } else {
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     cards = customSets[key];
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     sfState.currentSetName = key;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   }
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.currentSet = key;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.totalCards = cards.length;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.buffer = cards.map(c => ({...c}));
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.stats = {};
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.graduated = [];
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.seenCount = 0;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.phase = 1;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.benchmark = null;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.roundComplete = false;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.celebrationShown = false;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   // Initialize stats
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.buffer.forEach(c => {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   });
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.window = sfState.buffer.slice(0, sfState.windowSize);
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.buffer = sfState.buffer.slice(sfState.windowSize);
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfRenderHintChips();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfUpdateDisplay();
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfUpdateUI();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfSaveStats();
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   document.getElementById('sfHint').textContent = 'paused — press play to start';
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   document.getElementById('sfPlayPauseBtn').textContent = 'Play';
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
 }
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
 
 function sfRenderHintChips() {
@@ -1927,92 +1964,11 @@ function sfStop() {
   document.getElementById('sfPlayPauseBtn').textContent = 'Play';
 }
 
-function sfStep() {
-  if (!sfState.playing || sfState.paused) return;
-  if (!sfState.window.length) {
-    sfPause();
-    document.getElementById('sfHint').textContent = 'window empty — press Next to continue';
-    return;
-  }
-  // Cycle through all cards in the window
-  const currentCardIndex = sfState.currentIndex % sfState.window.length;
-  const card = sfState.window[currentCardIndex];
-  const el = document.getElementById('sfFlashDisplay');
-  el.textContent = card.front;
-  el.style.color = 'var(--text)';
-  sfState.stats[card.front].flashes++;
-  sfState.currentIndex++;
-  sfState.timer = setTimeout(sfStep, 60000 / sfState.cpm);
-}
 
-function sfNext() {
-  if (!sfState.window.length || sfState.paused) return;
-  const target = sfState.window[0];
-  // Save previous state for back button
-  sfState.previousState = {
-    window: [...sfState.window],
-    buffer: [...sfState.buffer],
-    graduated: [...sfState.graduated],
-    target: {...target},
-    stats: {...sfState.stats[target.front]}
-  };
-  sfState.canBack = true;
-  
-  // Green flash
-  const el = document.getElementById('sfFlashDisplay');
-  el.style.color = '#00ff88';
-  setTimeout(() => { el.style.color = 'var(--text)'; }, 200);
-  
-  // Graduate the target
-  sfState.stats[target.front].visits++;
-  sfState.stats[target.front].lap = sfState.phase;
-  sfState.seenCount++;
-  
-  // Remove from window
-  sfState.window.shift();
-  
-  // Add to graduated list (most recent)
-  sfState.graduated.unshift(target);
-  if (sfState.graduated.length > 4) sfState.graduated.pop();
-  
-  // Refill buffer from graduated if needed
-  if (sfState.buffer.length < sfState.windowSize - sfState.window.length) {
-    while (sfState.buffer.length < sfState.windowSize - sfState.window.length && sfState.graduated.length) {
-      sfState.buffer.push(sfState.graduated.pop());
-    }
-  }
-  
-  // Refill window from buffer
-  while (sfState.window.length < sfState.windowSize && sfState.buffer.length) {
-    sfState.window.push(sfState.buffer.shift());
-  }
-  
-  sfRenderHintChips();
-  sfUpdateDisplay();
-  sfUpdateUI();
-  sfSaveStats();
-  
-  // Check phase completion
-  sfCheckPhaseComplete();
-}
 
-function sfBack() {
-  if (!sfState.canBack || !sfState.previousState) return;
-  // Restore previous state
-  const prev = sfState.previousState;
-  sfState.window = prev.window;
-  sfState.buffer = prev.buffer;
-  sfState.graduated = prev.graduated;
-  sfState.stats[prev.target.front] = prev.stats;
-  sfState.seenCount--;
-  sfState.canBack = false;
-  sfState.previousState = null;
-  
-  sfRenderHintChips();
-  sfUpdateDisplay();
-  sfUpdateUI();
-  sfSaveStats();
-}
+
+
+
 
 function sfHint() {
   if (!sfState.window.length || sfState.paused) return;
@@ -2362,91 +2318,135 @@ function sfBuildSetSelector() {
 
 function sfSelectSet(key, type) {
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfStop();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   clearTimeout(sfState.timer);
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.playing = false;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.paused = true;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.graduated = [];
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.seenCount = 0;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.phase = 1;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.benchmark = null;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.celebrationShown = false;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.canBack = false;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.previousState = null;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   let cards;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   if (type === 'preload') {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     cards = SF_PRELOADED_SETS[key].cards;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     sfState.currentSetName = SF_PRELOADED_SETS[key].label;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   } else {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     const customSets = JSON.parse(localStorage.getItem('sf_custom_sets') || '{}');
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     cards = customSets[key];
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     sfState.currentSetName = key;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   }
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.currentSet = key;
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.totalCards = cards.length;
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.buffer = cards.map(c => ({...c}));
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfState.stats = {};
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.buffer.forEach(c => {
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
     sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   });
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfState.window = sfState.buffer.slice(0, sfState.windowSize);
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   if (sfState.buffer.length > sfState.windowSize) {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     sfState.buffer = sfState.buffer.slice(sfState.windowSize);
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   } else {
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
     sfState.buffer = [];
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   }
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfRenderHintChips();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfUpdateDisplay();
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   sfUpdateUI();
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   sfSaveStats();
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
   document.getElementById('sfHint').textContent = 'paused — press play to start';
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   document.getElementById('sfPlayPauseBtn').textContent = 'Play';
   sfState.currentIndex = 0;
+  sfState.currentIndex = 0;
 }
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
 
 function sfRenderHintChips() {
@@ -2542,81 +2542,11 @@ function sfStop() {
   document.getElementById('sfPlayPauseBtn').textContent = 'Play';
 }
 
-function sfStep() {
-  if (!sfState.playing || sfState.paused) return;
-  if (!sfState.window.length) {
-    sfPause();
-    document.getElementById('sfHint').textContent = 'window empty — press Next to continue';
-    return;
-  }
-  // Cycle through all cards in the window
-  const currentCardIndex = sfState.currentIndex % sfState.window.length;
-  const card = sfState.window[currentCardIndex];
-  const el = document.getElementById('sfFlashDisplay');
-  el.textContent = card.front;
-  el.style.color = 'var(--text)';
-  sfState.stats[card.front].flashes++;
-  sfState.currentIndex++;
-  sfState.timer = setTimeout(sfStep, 60000 / sfState.cpm);
-}
 
-function sfNext() {
-  if (!sfState.window.length || sfState.paused) return;
-  const target = sfState.window[0];
-  sfState.previousState = {
-    window: [...sfState.window],
-    buffer: [...sfState.buffer],
-    graduated: [...sfState.graduated],
-    target: {...target},
-    stats: {...sfState.stats[target.front]}
-  };
-  sfState.canBack = true;
-  
-  const el = document.getElementById('sfFlashDisplay');
-  el.style.color = '#00ff88';
-  setTimeout(() => { el.style.color = 'var(--text)'; }, 200);
-  
-  sfState.stats[target.front].visits++;
-  sfState.stats[target.front].lap = sfState.phase;
-  sfState.seenCount++;
-  
-  sfState.window.shift();
-  sfState.graduated.unshift(target);
-  if (sfState.graduated.length > 4) sfState.graduated.pop();
-  
-  if (sfState.buffer.length < sfState.windowSize - sfState.window.length) {
-    while (sfState.buffer.length < sfState.windowSize - sfState.window.length && sfState.graduated.length) {
-      sfState.buffer.push(sfState.graduated.pop());
-    }
-  }
-  
-  while (sfState.window.length < sfState.windowSize && sfState.buffer.length) {
-    sfState.window.push(sfState.buffer.shift());
-  }
-  
-  sfRenderHintChips();
-  sfUpdateDisplay();
-  sfUpdateUI();
-  sfSaveStats();
-  sfCheckPhaseComplete();
-}
 
-function sfBack() {
-  if (!sfState.canBack || !sfState.previousState) return;
-  const prev = sfState.previousState;
-  sfState.window = prev.window;
-  sfState.buffer = prev.buffer;
-  sfState.graduated = prev.graduated;
-  sfState.stats[prev.target.front] = prev.stats;
-  sfState.seenCount--;
-  sfState.canBack = false;
-  sfState.previousState = null;
-  
-  sfRenderHintChips();
-  sfUpdateDisplay();
-  sfUpdateUI();
-  sfSaveStats();
-}
+
+
+
 
 function sfHint() {
   if (!sfState.window.length || sfState.paused) return;
