@@ -30,6 +30,9 @@ header h1{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;letter-
 .app-card:hover{transform:translateY(-2px);}
 .app-card.bible:hover{border-color:var(--accent);}
 .app-card.jp:hover{border-color:var(--accent-jp);}
+.app-card.sf:hover{border-color:var(--accent2);}
+.app-card.sf .card-text h2{color:var(--accent2);}
+
 .card-icon{font-size:1.8rem;width:44px;text-align:center;flex-shrink:0;}
 .card-text h2{font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;margin-bottom:3px;}
 .app-card.bible .card-text h2{color:var(--accent);}
@@ -88,6 +91,10 @@ header h1{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;letter-
 .btn:disabled{opacity:0.3;cursor:not-allowed;}
 .btn.jp-primary{background:var(--accent-jp);color:#000;border-color:var(--accent-jp);font-weight:500;}
 .btn.jp-primary:hover{background:#2eb8f0;}
+.btn.sf-primary{background:var(--accent2);color:#000;border-color:var(--accent2);font-weight:500;}
+.btn.sf-primary:hover{background:#e85a3a;border-color:#e85a3a;}
+.btn.sf-primary:disabled{opacity:0.3;cursor:not-allowed;}
+
 .btn.danger{border-color:var(--accent2);color:var(--accent2);}
 .btn.danger:hover{background:rgba(255,107,71,0.12);}
 input[type=range]{-webkit-appearance:none;height:4px;background:var(--border);border-radius:99px;outline:none;flex:1;min-width:60px;cursor:pointer;}
@@ -200,6 +207,11 @@ textarea::placeholder{color:var(--muted);}
     </div>
     <div class="app-card jp" onclick="openApp('jp')">
       <div class="card-icon">あ</div>
+    <div class="app-card sf" onclick="openApp('sf')">
+      <div class="card-icon">⚡</div>
+      <div class="card-text"><h2>SpeedFlash</h2><p>Flashcard speed trainer — circular buffer with adaptive difficulty.</p></div>
+      <div class="card-arrow">›</div>
+    </div>
       <div class="card-text"><h2>Japanese Practice</h2><p>Hiragana & katakana — 4 stages each, compound levels, confused pairs, fluency test.</p></div>
       <div class="card-arrow">›</div>
     </div>
