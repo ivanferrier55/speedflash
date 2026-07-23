@@ -1830,13 +1830,8 @@ function sfUpdateDisplay() {
     return;
   }
   const card = sfState.window[0];
-  if (sfState.hintFlash) {
-    el.textContent = card.front;
-    el.style.color = 'var(--accent2)';
-  } else {
-    el.textContent = card.front;
-    el.style.color = 'var(--text)';
-  }
+  el.textContent = card.front;
+  el.style.color = 'var(--text)';
 }
 
 function sfUpdateUI() {
@@ -1901,7 +1896,13 @@ function sfStep() {
   const card = sfState.window[cardIndex];
   const el = document.getElementById('sfFlashDisplay');
   el.textContent = card.front;
-  el.style.color = 'var(--text)';
+  // Check if this is the target card and hintFlash is active
+  if (cardIndex === 0 && sfState.hintFlash) {
+    el.style.color = 'var(--accent2)';
+    sfState.hintFlash = false; // Reset after one red flash
+  } else {
+    el.style.color = 'var(--text)';
+  }
   // Only count flashes when target (index 0) is displayed
   if (cardIndex === 0) {
     sfState.stats[sfState.window[0].front].flashes++;
@@ -1970,20 +1971,9 @@ function sfBack() {
 
 function sfHint() {
   if (!sfState.window.length || sfState.paused) return;
+  // Set flag for red flash on next target appearance
   sfState.hintFlash = true;
   sfState.stats[sfState.window[0].front].hints++;
-  const el = document.getElementById('sfFlashDisplay');
-  el.textContent = sfState.window[0].front;
-  el.style.color = 'var(--accent2)';
-  setTimeout(() => {
-    el.textContent = sfState.window[0].back;
-    el.style.color = 'var(--accent)';
-    setTimeout(() => {
-      el.textContent = sfState.window[0].front;
-      el.style.color = 'var(--text)';
-      sfState.hintFlash = false;
-    }, 500);
-  }, 500);
 }
 
 function sfSetCPM(cpm) {
