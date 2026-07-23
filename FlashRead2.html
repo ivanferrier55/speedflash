@@ -1760,6 +1760,8 @@ function sfSelectSet(key, type) {
   sfState.celebrationShown = false;
   sfState.canBack = false;
   sfState.previousState = null;
+  sfState.currentIndex = 0
+  sfState.currentIndex = 0;
   sfState.currentIndex = 0;
   
   let cards;
@@ -1894,8 +1896,17 @@ function sfStep() {
     document.getElementById('sfHint').textContent = 'window empty — press Next to continue';
     return;
   }
-  sfUpdateDisplay();
-  sfState.stats[sfState.window[0].front].flashes++;
+  // Cycle through all cards in window at full CPM speed
+  const cardIndex = sfState.currentIndex % sfState.window.length;
+  const card = sfState.window[cardIndex];
+  const el = document.getElementById('sfFlashDisplay');
+  el.textContent = card.front;
+  el.style.color = 'var(--text)';
+  // Only count flashes when target (index 0) is displayed
+  if (cardIndex === 0) {
+    sfState.stats[sfState.window[0].front].flashes++;
+  }
+  sfState.currentIndex++;
   sfState.timer = setTimeout(sfStep, 60000 / sfState.cpm);
 }
 
