@@ -221,6 +221,7 @@ textarea::placeholder{color:var(--muted);}
   <div class="app-main">
     <div class="stage-display" style="height:200px;">
       <div style="position:absolute;top:42%;transform:translateY(-50%);width:100%;display:flex;justify-content:center;align-items:center;pointer-events:none;">
+      <div style="position:absolute;bottom:35px;font-size:0.5rem;color:var(--muted);letter-spacing:0.06em;" id="sfBufferSize">Buffer: 0</div>
         <div style="width:24px;height:2px;background:var(--accent);opacity:0.4;"></div>
         <div style="width:68px;"></div>
         <div style="width:24px;height:2px;background:var(--accent);opacity:0.4;"></div>
@@ -455,6 +456,7 @@ textarea::placeholder{color:var(--muted);}
 <div class="screen" id="sfScreen">
   <div class="app-main">
     <div class="stage-display" style="height:200px;">
+      <div style="position:absolute;bottom:35px;font-size:0.5rem;color:var(--muted);letter-spacing:0.06em;" id="sfBufferSize">Buffer: 0</div>
       <div class="word-display" id="sfFlashDisplay" style="font-size:clamp(3rem,8vw,5rem);">📚</div>
       <div class="stage-hint" id="sfHint">select a set and press play</div>
     </div>
@@ -493,6 +495,12 @@ textarea::placeholder{color:var(--muted);}
         <button class="sample-btn" onclick="document.getElementById('sfCsvUpload').click()">📤 Upload CSV</button>
         <button class="sample-btn" onclick="sfResetSet()">🔄 Reset Set</button>
       </div>
+    </div>
+    <div class="card-panel" id="sfBufferPanel">
+      <div class="panel-header">
+        <span class="panel-label">Buffer Status</span>
+      </div>
+      <div id="sfBufferList" style="display:flex;flex-wrap:wrap;gap:4px;min-height:30px;font-size:0.6rem;color:var(--muted);"></div>
     </div>
     <div class="card-panel" id="sfStatsPanel" style="display:none;">
       <div class="panel-header">
@@ -1711,6 +1719,7 @@ let sfState = {
 };
 
 function sfInit() {
+  renderBufferList();
   sfBuildSetSelector();
   sfLoadStats();
   if (!sfState.currentSet) {
@@ -1777,7 +1786,15 @@ function sfSelectSet(key, type) {
   sfState.totalCards = cards.length;
   sfState.buffer = cards.map(c => ({...c}));
   sfState.stats = {};
+  // Store back values for stats lookup
   sfState.buffer.forEach(c => {
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
+  sfState.buffer.forEach(c => {
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
     sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
   });
   
@@ -1789,6 +1806,8 @@ function sfSelectSet(key, type) {
   }
   
   sfRenderHintChips();
+  renderBufferList();
+  renderBufferList();
   sfUpdateDisplay();
   sfUpdateUI();
   sfSaveStats();
@@ -1843,9 +1862,12 @@ function sfUpdateUI() {
   document.getElementById('sfProgressCount').textContent = `${sfState.window.length} in window`;
   const progress = total > 0 ? (seen / total * 100) : 0;
   document.getElementById('sfProgressBar').style.width = Math.min(progress, 100) + '%';
-  document.getElementById('sfNextBtn').disabled = !sfState.window.length || sfState.paused;
+  document.getElementById('sfNextBtn').disabled = !sfState.window.length || sfState.paused || sfState.celebrationShown;
   document.getElementById('sfBackBtn').disabled = !sfState.canBack;
-  document.getElementById('sfHintBtn').disabled = !sfState.window.length || sfState.paused;
+  document.getElementById('sfHintBtn').disabled = !sfState.window.length || sfState.paused || sfState.celebrationShown;
+  
+  // Update buffer list
+  renderBufferList();
 }
 
 function sfTogglePlayPause() {
@@ -1920,7 +1942,7 @@ function sfNext() {
   sfState.paused = true;
   clearTimeout(sfState.timer);
   
-  // Green flash for 1 second
+  // Green flash
   el.textContent = target.front;
   el.style.color = '#00ff88';
   
@@ -1971,6 +1993,8 @@ function sfNext() {
     }
     
     sfRenderHintChips();
+  renderBufferList();
+  renderBufferList();
     sfUpdateDisplay();
     sfUpdateUI();
     sfSaveStats();
@@ -1990,6 +2014,8 @@ function sfBack() {
   sfState.previousState = null;
   
   sfRenderHintChips();
+  renderBufferList();
+  renderBufferList();
   sfUpdateDisplay();
   sfUpdateUI();
   sfSaveStats();
@@ -2011,6 +2037,7 @@ function sfSetCPM(cpm) {
 }
 
 function sfCheckPhaseComplete() {
+  console.log(`Phase: ${sfState.phase}, seenCount: ${sfState.seenCount}, totalCards: ${sfState.totalCards}`);
   if (sfState.phase === 1 && sfState.seenCount >= sfState.totalCards) {
     const noHintCards = Object.keys(sfState.stats)
       .filter(k => sfState.stats[k].hints === 0 && sfState.stats[k].visits > 0)
@@ -2026,11 +2053,27 @@ function sfCheckPhaseComplete() {
     }
     
     sfState.phase = 2;
+    // Rebuild buffer for phase 2 from all cards
+    const allCards = Object.keys(sfState.stats).map(k => {
+      return {front: k, back: sfState.stats[k].back || k};
+    });
+    sfState.buffer = allCards.map(c => ({...c}));
+    sfState.graduated = [];
+    sfState.window = sfState.buffer.slice(0, sfState.windowSize);
+    sfState.buffer = sfState.buffer.slice(sfState.windowSize);
+    renderBufferList();
     sfState.seenCount = 0;
     sfState.totalCards = Object.keys(sfState.stats).length;
+    // Reset visits for phase 2
     Object.keys(sfState.stats).forEach(k => {
       sfState.stats[k].visits = 0;
     });
+    // Rebuild buffer from all cards for phase 2
+    const allCards = Object.keys(sfState.stats).map(k => ({front: k, back: sfState.stats[k].back || k}));
+    sfState.buffer = allCards.map(c => ({...c}));
+    sfState.graduated = [];
+    sfState.window = sfState.buffer.slice(0, sfState.windowSize);
+    sfState.buffer = sfState.buffer.slice(sfState.windowSize);
     sfShowCelebration('🎉 All cards seen! Phase 2 started!');
     sfUpdateUI();
   } else if (sfState.phase === 2) {
@@ -2164,6 +2207,12 @@ function sfResetSet() {
       sfState.buffer = SF_PRELOADED_SETS[sfState.currentSet].cards.map(c => ({...c}));
     }
     sfState.stats = {};
+  // Store back values for stats lookup
+  sfState.buffer.forEach(c => {
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
     sfState.graduated = [];
     sfState.seenCount = 0;
     sfState.phase = 1;
@@ -2171,10 +2220,14 @@ function sfResetSet() {
     sfState.celebrationShown = false;
     sfState.window = sfState.buffer.slice(0, sfState.windowSize);
     sfState.buffer = sfState.buffer.slice(sfState.windowSize);
-    sfState.buffer.forEach(c => {
+  sfState.buffer.forEach(c => {
+    sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null, back: c.back};
+  });
       sfState.stats[c.front] = {flashes: 0, hints: 0, visits: 0, lap: null};
     });
     sfRenderHintChips();
+  renderBufferList();
+  renderBufferList();
     sfUpdateDisplay();
     sfUpdateUI();
     sfSaveStats();
@@ -2222,3 +2275,61 @@ function jpInit(){
 </script>
 </body>
 </html>
+function renderBufferList() {
+  const el = document.getElementById('sfBufferList');
+  if (!el) return;
+  el.innerHTML = '';
+  
+  // Show window cards with target highlighted
+  if (sfState.window.length) {
+    sfState.window.forEach((card, idx) => {
+      const span = document.createElement('span');
+      span.textContent = card.front;
+      span.style.cssText = `padding:2px 6px;border-radius:4px;border:1px solid var(--border);`;
+      if (idx === 0) {
+        span.style.borderColor = 'var(--accent2)';
+        span.style.background = 'rgba(255,107,71,0.15)';
+        span.style.color = 'var(--accent2)';
+        span.style.fontWeight = 'bold';
+      } else {
+        span.style.color = 'var(--muted)';
+      }
+      el.appendChild(span);
+    });
+    // Add separator
+    const sep = document.createElement('span');
+    sep.textContent = '|';
+    sep.style.cssText = 'color:var(--border);padding:0 4px;';
+    el.appendChild(sep);
+  }
+  
+  // Show buffer cards (limited to first 10)
+  if (sfState.buffer.length) {
+    const showCount = Math.min(sfState.buffer.length, 10);
+    for (let i = 0; i < showCount; i++) {
+      const span = document.createElement('span');
+      span.textContent = sfState.buffer[i].front;
+      span.style.cssText = 'padding:2px 6px;border-radius:4px;border:1px solid var(--border);color:var(--muted);';
+      el.appendChild(span);
+    }
+    if (sfState.buffer.length > 10) {
+      const more = document.createElement('span');
+      more.textContent = `+${sfState.buffer.length - 10} more`;
+      more.style.cssText = 'padding:2px 6px;color:var(--muted);font-style:italic;';
+      el.appendChild(more);
+    }
+  } else {
+    const empty = document.createElement('span');
+    empty.textContent = 'Buffer empty';
+    empty.style.cssText = 'color:var(--muted);font-style:italic;';
+    el.appendChild(empty);
+  }
+  
+  // Show graduated count
+  if (sfState.graduated.length) {
+    const grad = document.createElement('span');
+    grad.textContent = `📦 ${sfState.graduated.length} graduated`;
+    grad.style.cssText = 'padding:2px 6px;color:var(--muted);';
+    el.appendChild(grad);
+  }
+}
