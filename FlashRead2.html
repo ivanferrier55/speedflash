@@ -1914,42 +1914,68 @@ function sfStep() {
 function sfNext() {
   if (!sfState.window.length || sfState.paused) return;
   const target = sfState.window[0];
-  sfState.previousState = {
-    window: [...sfState.window],
-    buffer: [...sfState.buffer],
-    graduated: [...sfState.graduated],
-    target: {...target},
-    stats: {...sfState.stats[target.front]}
-  };
-  sfState.canBack = true;
-  
   const el = document.getElementById('sfFlashDisplay');
+  
+  // Pause the flash cycle
+  sfState.paused = true;
+  clearTimeout(sfState.timer);
+  
+  // Green flash for 1 second
+  el.textContent = target.front;
   el.style.color = '#00ff88';
-  setTimeout(() => { el.style.color = 'var(--text)'; }, 200);
   
-  sfState.stats[target.front].visits++;
-  sfState.stats[target.front].lap = sfState.phase;
-  sfState.seenCount++;
-  
-  sfState.window.shift();
-  sfState.graduated.unshift(target);
-  if (sfState.graduated.length > 4) sfState.graduated.pop();
-  
-  if (sfState.buffer.length < sfState.windowSize - sfState.window.length) {
-    while (sfState.buffer.length < sfState.windowSize - sfState.window.length && sfState.graduated.length) {
-      sfState.buffer.push(sfState.graduated.pop());
+  setTimeout(() => {
+    // Resume normal color
+    el.style.color = 'var(--text)';
+    
+    // Save previous state for back button
+    sfState.previousState = {
+      window: [...sfState.window],
+      buffer: [...sfState.buffer],
+      graduated: [...sfState.graduated],
+      target: {...target},
+      stats: {...sfState.stats[target.front]}
+    };
+    sfState.canBack = true;
+    
+    // Graduate the target
+    sfState.stats[target.front].visits++;
+    sfState.stats[target.front].lap = sfState.phase;
+    sfState.seenCount++;
+    
+    // Remove from window
+    sfState.window.shift();
+    
+    // Add to graduated list (most recent)
+    sfState.graduated.unshift(target);
+    if (sfState.graduated.length > 4) sfState.graduated.pop();
+    
+    // Refill buffer from graduated if needed
+    if (sfState.buffer.length < sfState.windowSize - sfState.window.length) {
+      while (sfState.buffer.length < sfState.windowSize - sfState.window.length && sfState.graduated.length) {
+        sfState.buffer.push(sfState.graduated.pop());
+      }
     }
-  }
-  
-  while (sfState.window.length < sfState.windowSize && sfState.buffer.length) {
-    sfState.window.push(sfState.buffer.shift());
-  }
-  
-  sfRenderHintChips();
-  sfUpdateDisplay();
-  sfUpdateUI();
-  sfSaveStats();
-  sfCheckPhaseComplete();
+    
+    // Refill window from buffer
+    while (sfState.window.length < sfState.windowSize && sfState.buffer.length) {
+      sfState.window.push(sfState.buffer.shift());
+    }
+    
+    // Resume the flash cycle if it was playing
+    if (sfState.playing) {
+      sfState.paused = false;
+      sfState.timer = setTimeout(sfStep, 60000 / sfState.cpm);
+    } else {
+      sfState.paused = true;
+    }
+    
+    sfRenderHintChips();
+    sfUpdateDisplay();
+    sfUpdateUI();
+    sfSaveStats();
+    sfCheckPhaseComplete();
+  }, 200); // 0.2 seconds
 }
 
 function sfBack() {
